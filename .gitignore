@@ -17,9 +17,19 @@ pnpm-debug.log*
 # Environment files
 .env
 .env.*
+!.env.example
 
 # OS and editors
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+
+# Local tooling and caches
+.codex
+.codex/
+__pycache__/
+*.py[cod]
+
+# Local-only branding asset kept outside git
+assets/homi.jpg

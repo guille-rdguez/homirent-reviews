@@ -14,9 +14,12 @@ Valida:
 
 - `http://127.0.0.1:4173/form.html`
 - `http://127.0.0.1:4173/dashboard.html`
-- Login del dashboard:
-  - Usuario: `admin`
-  - Contraseña: `Soporte123*`
+
+Si `4173` está ocupado, usa la URL exacta que imprime `serve-local.py` al arrancar.
+
+Login del dashboard:
+
+- valida con las credenciales internas vigentes del equipo
 
 ## 2. Publicar en Netlify
 
@@ -25,7 +28,13 @@ Opción simple:
 1. Entra a Netlify.
 2. Usa `Add new site`.
 3. Sube esta carpeta completa o conecta el repo.
-4. Publica la raíz del proyecto.
+4. Configura variables de entorno antes de publicar:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `DASHBOARD_USERNAME`
+   - `DASHBOARD_PASSWORD` o `DASHBOARD_PASSWORD_HASH`
+   - `DASHBOARD_SESSION_SECRET`
+5. Publica la raíz del proyecto.
 
 Archivos importantes para deploy:
 
@@ -33,6 +42,7 @@ Archivos importantes para deploy:
 - `dashboard.html`
 - `index.html`
 - `netlify.toml`
+- `netlify/functions/*`
 
 ## 3. URLs a revisar en producción
 
@@ -81,9 +91,11 @@ Valida:
 Confirma:
 
 - que el dashboard sí pide login
+- que el login del dashboard funciona contra `/api/dashboard-login`
 - que Supabase sigue devolviendo propiedades activas
 - que `Export CSV` descarga el archivo correctamente
 - que los QR abren la URL pública, no la local
+- que Netlify ya tenga configurado `SUPABASE_SERVICE_ROLE_KEY` y `DASHBOARD_SESSION_SECRET`
 
 ## 8. Recomendación inmediata después del go live
 

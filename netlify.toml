@@ -1,6 +1,29 @@
 [build]
   publish = "."
 
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/dashboard-login"
+  to = "/.netlify/functions/dashboard-login"
+  status = 200
+
+[[redirects]]
+  from = "/api/dashboard-session"
+  to = "/.netlify/functions/dashboard-session"
+  status = 200
+
+[[redirects]]
+  from = "/api/dashboard-data"
+  to = "/.netlify/functions/dashboard-data"
+  status = 200
+
+[[redirects]]
+  from = "/api/dashboard-logout"
+  to = "/.netlify/functions/dashboard-logout"
+  status = 200
+
 [[headers]]
   for = "/*.html"
   [headers.values]
@@ -8,5 +31,10 @@
 
 [[headers]]
   for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/api/*"
   [headers.values]
     Cache-Control = "no-store"
