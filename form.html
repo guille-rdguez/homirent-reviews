@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Homi — Califica tu estancia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green:   #10493a;
+  --green2:  #1a6050;
+  --green-l: #e8f5f0;
+  --navy:    #0b1c33;
+  --white:   #ffffff;
+  --gray:    #f4f6f8;
+  --gray2:   #e8ecf0;
+  --text:    #0b1c33;
+  --text2:   #4a6a8a;
+  --text3:   #94a8bc;
+  --border:  #dde3ea;
+  --border2: #c8d2dc;
+  --shadow:  0 4px 32px rgba(11,28,51,0.09);
+  --font-head: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { min-height:100vh; font-family:var(--font-body); }
+body { background:var(--gray); display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:36px 16px 56px; }
+
+/* LOGO */
+.logo-area { text-align:center; margin-bottom:28px; }
+.logo-lockup { display:inline-flex; align-items:center; gap:12px; margin-bottom:12px; }
+.logo-name { font-family:var(--font-head); font-size:26px; font-weight:800; color:var(--green); letter-spacing:1px; line-height:1; }
+.logo-rent { font-size:11px; color:var(--text3); letter-spacing:0.4px; margin-top:2px; }
+.logo-tagline { font-size:14px; color:var(--text2); max-width:320px; margin:0 auto; line-height:1.6; }
+
+/* CARD */
+.card { background:var(--white); border-radius:22px; box-shadow:var(--shadow); border:1px solid var(--border); width:100%; max-width:500px; overflow:hidden; }
+
+/* CARD HEAD */
+.card-head { background:var(--green); padding:26px 28px 22px; text-align:center; }
+.head-title { font-family:var(--font-head); font-size:19px; font-weight:700; color:#fff; line-height:1.3; }
+.head-sub { font-size:13px; color:rgba(255,255,255,0.6); margin-top:4px; }
+.steps { display:flex; justify-content:center; gap:5px; margin-top:18px; }
+.sdot { width:6px; height:6px; border-radius:3px; background:rgba(255,255,255,0.25); transition:all 0.3s; }
+.sdot.active { background:#fff; width:20px; }
+.sdot.done { background:rgba(255,255,255,0.6); }
+
+/* BODY */
+.card-body { padding:28px 28px 30px; }
+
+/* STARS */
+.star-wrap { display:flex; justify-content:center; gap:8px; margin:14px 0 6px; }
+.star-btn { background:none; border:none; cursor:pointer; font-size:40px; line-height:1; padding:4px; transition:transform 0.15s; filter:grayscale(1) opacity(0.2); }
+.star-btn:hover { transform:scale(1.18); filter:none; }
+.star-btn.lit { filter:none; }
+.star-btn[data-val="1"].lit { color:#dc2626; }
+.star-btn[data-val="2"].lit { color:#ea580c; }
+.star-btn[data-val="3"].lit { color:#ca8a04; }
+.star-btn[data-val="4"].lit { color:#65a30d; }
+.star-btn[data-val="5"].lit { color:#16a34a; }
+.star-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--text3); padding:0 6px; margin-bottom:20px; }
+.star-error { text-align:center; font-size:12px; color:#dc2626; margin-top:-12px; margin-bottom:10px; display:none; }
+
+/* FIELDS */
+.field { margin-bottom:16px; }
+.flabel { display:block; font-size:11px; font-weight:600; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
+.flabel .opt { font-weight:400; color:var(--text3); text-transform:none; letter-spacing:0; }
+.finput, .fselect, .ftextarea {
+  width:100%; background:var(--gray); border:1.5px solid var(--border);
+  border-radius:11px; padding:11px 14px;
+  font-family:var(--font-body); font-size:14px; color:var(--text);
+  outline:none; transition:all 0.2s; -webkit-appearance:none;
+}
+.finput:focus, .fselect:focus, .ftextarea:focus { border-color:var(--green); background:var(--white); box-shadow:0 0 0 3px rgba(16,73,58,0.08); }
+.ftextarea { resize:none; height:90px; }
+.fselect { cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2310493a' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; padding-right:36px; background-color:var(--gray); }
+.fselect:focus { background-color:var(--white); }
+.field.err .finput, .field.err .fselect { border-color:#dc2626; }
+.ferr { font-size:11px; color:#dc2626; margin-top:4px; display:none; }
+.field.err .ferr { display:block; }
+.fhelper { display:none; font-size:12px; color:var(--text2); line-height:1.5; margin-top:8px; }
+.fhelper.show { display:block; }
+.fselect:disabled { background-color:var(--green-l); border-color:rgba(16,73,58,0.16); color:var(--green); cursor:not-allowed; opacity:1; }
+
+/* RETURN BTNS */
+.ret-row { display:flex; gap:10px; margin-bottom:20px; }
+.ret-btn { flex:1; padding:12px; border:1.5px solid var(--border2); border-radius:11px; background:var(--gray); font-family:var(--font-body); font-size:14px; font-weight:500; color:var(--text2); cursor:pointer; text-align:center; transition:all 0.15s; }
+.ret-btn:hover { border-color:var(--green); color:var(--green); background:var(--green-l); }
+.ret-btn.yes { background:var(--green-l); border-color:var(--green); color:var(--green); }
+.ret-btn.no  { background:#fff5f5; border-color:#dc2626; color:#dc2626; }
+
+/* SUBMIT */
+.submit-btn { width:100%; background:var(--green); color:#fff; border:none; border-radius:12px; padding:15px; font-family:var(--font-body); font-size:15px; font-weight:600; cursor:pointer; transition:all 0.2s; letter-spacing:0.2px; }
+.submit-btn:hover { background:var(--green2); transform:translateY(-1px); box-shadow:0 4px 16px rgba(16,73,58,0.25); }
+.submit-btn:active { transform:none; box-shadow:none; }
+.submit-btn:disabled { background:var(--text3); cursor:not-allowed; transform:none; box-shadow:none; }
+
+/* BACK */
+.back-btn { width:46px; height:46px; flex-shrink:0; background:var(--gray); border:1.5px solid var(--border2); border-radius:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--text2); transition:all 0.15s; }
+.back-btn:hover { border-color:var(--green); color:var(--green); background:var(--green-l); }
+.row-btns { display:flex; gap:10px; }
+.row-btns .submit-btn { flex:1; }
+
+/* SUCCESS */
+.success { text-align:center; padding:12px 0 4px; display:none; }
+.success-icon { font-size:56px; margin-bottom:16px; }
+.success-title { font-family:var(--font-head); font-size:22px; font-weight:800; color:var(--text); margin-bottom:8px; }
+.success-msg { font-size:14px; color:var(--text2); line-height:1.7; margin-bottom:24px; }
+.success-reset { display:none; margin:-8px 0 18px; font-size:12px; color:var(--text3); }
+.success-again { background:none; border:1.5px solid var(--border2); border-radius:11px; padding:10px 22px; font-family:var(--font-body); font-size:14px; color:var(--text2); cursor:pointer; transition:all 0.15s; }
+.success-again:hover { border-color:var(--green); color:var(--green); }
+
+/* LOADER */
+.loader { display:none; position:fixed; inset:0; background:rgba(255,255,255,0.8); align-items:center; justify-content:center; z-index:99; backdrop-filter:blur(3px); }
+.loader.show { display:flex; }
+.spinner { width:40px; height:40px; border:3px solid var(--gray2); border-top-color:var(--green); border-radius:50%; animation:spin 0.7s linear infinite; }
+@keyframes spin { to{ transform:rotate(360deg); } }
+
+.powered { margin-top:18px; font-size:11px; color:var(--text3); text-align:center; }
+.powered strong { color:var(--green); font-weight:600; }
+
+.form-note {
+  display:none;
+  margin-bottom:18px;
+  padding:12px 14px;
+  border-radius:14px;
+  border:1px solid #d9e5f1;
+  background:#eef5ff;
+  color:#1d4f91;
+  font-size:12px;
+  line-height:1.6;
+}
+.form-note.warn {
+  border-color:#f3d79c;
+  background:#fff8e7;
+  color:#9a6700;
+}
+</style>
+</head>
+<body>
+
+<div class="logo-area">
+  <div class="logo-lockup">
+    <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+      <rect width="44" height="44" rx="11" fill="#10493a"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M10 13.5C10 11.57 11.57 10 13.5 10H18.5C20.43 10 22 11.57 22 13.5V18H22V13.5C22 11.57 23.57 10 25.5 10H30.5C32.43 10 34 11.57 34 13.5V30.5C34 32.43 32.43 34 30.5 34H25.5C23.57 34 22 32.43 22 30.5V27L22 27L22 30.5C22 32.43 20.43 34 18.5 34H13.5C11.57 34 10 32.43 10 30.5V13.5Z" fill="white"/>
+      <path d="M18 24L22 20L26 24" stroke="#10493a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+    <div>
+      <div class="logo-name">HOMI</div>
+      <div class="logo-rent">rent</div>
+    </div>
+  </div>
+  <div class="logo-tagline">Ayúdanos a mejorar nuestro servicio respondiendo las siguientes preguntas</div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <div class="head-title" id="step-title">¿Cómo calificarías tu estancia?</div>
+    <div class="head-sub" id="step-sub">Tu opinión es muy importante para nosotros</div>
+    <div class="steps">
+      <div class="sdot active" id="dot0"></div>
+      <div class="sdot" id="dot1"></div>
+      <div class="sdot" id="dot2"></div>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div class="form-note" id="form-note"></div>
+
+    <!-- STEP 0 -->
+    <div id="step0">
+      <div class="star-wrap">
+        <button type="button" class="star-btn" data-val="1" onclick="setStar(1)">★</button>
+        <button type="button" class="star-btn" data-val="2" onclick="setStar(2)">★</button>
+        <button type="button" class="star-btn" data-val="3" onclick="setStar(3)">★</button>
+        <button type="button" class="star-btn" data-val="4" onclick="setStar(4)">★</button>
+        <button type="button" class="star-btn" data-val="5" onclick="setStar(5)">★</button>
+      </div>
+      <div class="star-labels"><span>Pésimo</span><span>Excelente</span></div>
+      <div class="star-error" id="star-err">Por favor selecciona una calificación</div>
+      <button type="button" class="submit-btn" onclick="next(0)">Continuar →</button>
+    </div>
+
+    <!-- STEP 1 -->
+    <div id="step1" style="display:none">
+      <div class="field" id="f-guest">
+        <label class="flabel">Tu nombre <span class="opt">(opcional)</span></label>
+        <input type="text" class="finput" id="guest-name" placeholder="Ej. María González" autocomplete="name">
+      </div>
+      <div class="field" id="f-room">
+        <label class="flabel">Número de habitación o suite</label>
+        <input type="text" class="finput" id="room-name" placeholder="Ej. 301, Suite A..." autocomplete="off">
+        <div class="ferr">Este campo es requerido</div>
+      </div>
+      <div class="field" id="f-prop">
+        <label class="flabel">Complejo donde te hospedaste</label>
+        <select class="fselect" id="prop-select"><option value="">Selecciona tu complejo...</option></select>
+        <div class="fhelper" id="prop-helper"></div>
+        <div class="ferr">Por favor selecciona el complejo</div>
+      </div>
+      <div class="row-btns">
+        <button type="button" class="back-btn" onclick="back(1)">←</button>
+        <button type="button" class="submit-btn" onclick="next(1)">Continuar →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="step2" style="display:none">
+      <div class="field">
+        <label class="flabel">¿Qué podríamos mejorar? <span class="opt">(opcional)</span></label>
+        <textarea class="ftextarea" id="comment" placeholder="Cuéntanos tu experiencia, qué te gustó o en qué podemos mejorar..."></textarea>
+      </div>
+      <div class="field">
+        <label class="flabel">¿Volverías a hospedarte con nosotros?</label>
+        <div class="ret-row">
+          <button type="button" class="ret-btn" id="btn-yes" onclick="setReturn(true)">👍 Sí, claro</button>
+          <button type="button" class="ret-btn" id="btn-no" onclick="setReturn(false)">🤔 Lo pensaría</button>
+        </div>
+      </div>
+      <div class="row-btns">
+        <button type="button" class="back-btn" onclick="back(2)">←</button>
+        <button type="button" class="submit-btn" id="final-btn" onclick="submitReview()">Enviar reseña ✓</button>
+      </div>
+    </div>
+
+    <!-- SUCCESS -->
+    <div class="success" id="success">
+      <div class="success-icon">🎉</div>
+      <div class="success-title">¡Gracias por tu reseña!</div>
+      <div class="success-msg">Tu opinión nos ayuda a mejorar la experiencia para todos nuestros huéspedes.<br>¡Esperamos verte pronto!</div>
+      <div class="success-reset" id="success-reset"></div>
+      <button type="button" class="success-again" onclick="reset()">Enviar otra reseña</button>
+    </div>
+  </div>
+</div>
+
+<div class="powered">Powered by <strong>HOMI.REVIEWS</strong></div>
+<div class="loader" id="loader"><div class="spinner"></div></div>
+
+<script>
+const SB_URL='https://kmzooracfzxmhtabenax.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imttem9vcmFjZnp4bWh0YWJlbmF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MzY4ODcsImV4cCI6MjA5MDExMjg4N30.vCiEFwuSeWoEN8puAP-9JQ-ua6UDXHEMsqL0tlx3gGc';
+const FALLBACK_PROPS=[{id:'q1',city:'Querétaro',name:'El Doce'},{id:'q2',city:'Querétaro',name:'Morelos'},{id:'q3',city:'Querétaro',name:'Hacienda Santa Bárbara'},{id:'q4',city:'Querétaro',name:'Musgo'},{id:'q5',city:'Querétaro',name:'Universidad'},{id:'q6',city:'Querétaro',name:'Allende'},{id:'q7',city:'Querétaro',name:'Liquidambar'},{id:'q8',city:'Querétaro',name:'Wenceslao'},{id:'q9',city:'Querétaro',name:'Pájaros'},{id:'q10',city:'Querétaro',name:'Primavera'},{id:'q11',city:'Querétaro',name:'Ezequiel Montes'},{id:'q12',city:'Querétaro',name:'Suite Álamos'},{id:'q13',city:'Querétaro',name:'Damian Carmona'},{id:'m1',city:'Ciudad de México',name:'Balsas'},{id:'m2',city:'Ciudad de México',name:'Prosperidad'},{id:'m3',city:'Ciudad de México',name:'Lago Zirahuén'},{id:'e1',city:'Mérida',name:'Suites Reforma'}];
+const params=new URLSearchParams(window.location.search);
+const ALLOWED_SOURCES=new Set(['form','qr','email','whatsapp','ipad']);
+const SOURCE=ALLOWED_SOURCES.has(params.get('source'))?params.get('source'):'form';
+const LOCKED_PROPERTY_ID=params.get('property')||'';
+const SHOULD_AUTO_RESET=SOURCE==='ipad'||params.get('autoreset')==='1';
+const AUTO_RESET_SECONDS=8;
+let rating=0,wouldReturn=null,usingFallbackProps=false,lockedPropertyName='',autoResetTimer=null,autoResetCountdown=null;
+const STEPS=[{title:'¿Cómo calificarías tu estancia?',sub:'Tu opinión es muy importante para nosotros'},{title:'Cuéntanos sobre tu estancia',sub:'Nos ayuda a identificar tu visita'},{title:'Un par de preguntas más',sub:'Solo tomará un momento'}];
+
+function setStar(val){rating=val;document.querySelectorAll('.star-btn').forEach((b,i)=>b.classList.toggle('lit',i<val));document.getElementById('star-err').style.display='none';}
+function setReturn(val){wouldReturn=val;document.getElementById('btn-yes').className='ret-btn'+(val===true?' yes':'');document.getElementById('btn-no').className='ret-btn'+(val===false?' no':'');}
+function sourceLabel(src){return({form:'formulario web',qr:'QR',email:'email',whatsapp:'WhatsApp',ipad:'iPad recepción'})[src]||'formulario web';}
+function clearResetTimers(){if(autoResetTimer)clearTimeout(autoResetTimer);if(autoResetCountdown)clearInterval(autoResetCountdown);autoResetTimer=null;autoResetCountdown=null;}
+function setFormNote(messages,type='info'){
+  const note=document.getElementById('form-note');
+  if(!messages.length){note.style.display='none';note.className='form-note';note.innerHTML='';return;}
+  note.className='form-note'+(type==='warn'?' warn':'');
+  note.innerHTML=messages.join(' ');
+  note.style.display='block';
+}
+function updateFormNote(){
+  const messages=[];let type='info';
+  if(SOURCE!=='form')messages.push(`Origen detectado: <strong>${sourceLabel(SOURCE)}</strong>.`);
+  if(LOCKED_PROPERTY_ID&&lockedPropertyName)messages.push(`Este enlace está configurado para <strong>${lockedPropertyName}</strong>.`);
+  if(usingFallbackProps){type='warn';messages.push('No se pudieron cargar los complejos en vivo; se activó la lista local de respaldo.');}
+  if(!navigator.onLine){type='warn';messages.push('Sin conexión: puedes capturar datos, pero enviar la reseña requiere internet.');}
+  setFormNote(messages,type);
+}
+function renderProperties(props){
+  const sel=document.getElementById('prop-select');
+  const byCity={};
+  sel.innerHTML='<option value="">Selecciona tu complejo...</option>';
+  props.forEach(p=>{if(!byCity[p.city])byCity[p.city]=[];byCity[p.city].push(p);});
+  Object.keys(byCity).sort().forEach(city=>{
+    const og=document.createElement('optgroup');
+    og.label=city;
+    byCity[city].forEach(p=>{
+      const o=document.createElement('option');
+      o.value=p.id;
+      o.textContent=p.name;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+}
+function applyLockedProperty(props){
+  const sel=document.getElementById('prop-select');
+  const helper=document.getElementById('prop-helper');
+  lockedPropertyName='';
+  sel.disabled=false;
+  helper.className='fhelper';
+  helper.textContent='';
+  if(!LOCKED_PROPERTY_ID){updateFormNote();return;}
+  const match=props.find(p=>p.id===LOCKED_PROPERTY_ID);
+  if(match){
+    sel.value=match.id;
+    sel.disabled=true;
+    lockedPropertyName=`${match.name} · ${match.city}`;
+    helper.textContent='Complejo preseleccionado para este enlace. Si necesitas cambiarlo, usa la versión general del formulario.';
+  }else{
+    helper.textContent='No encontramos el complejo configurado en este enlace. Dejamos la selección manual habilitada.';
+  }
+  helper.className='fhelper show';
+  document.getElementById('f-prop').classList.remove('err');
+  updateFormNote();
+}
+function syncLockedProperty(){if(LOCKED_PROPERTY_ID&&document.getElementById('prop-select').disabled)document.getElementById('prop-select').value=LOCKED_PROPERTY_ID;}
+
+function showStep(n){
+  [0,1,2].forEach(i=>{document.getElementById('step'+i).style.display=i===n?'block':'none';const d=document.getElementById('dot'+i);d.className='sdot';if(i===n)d.classList.add('active');else if(i<n)d.classList.add('done');});
+  document.getElementById('step-title').textContent=STEPS[n].title;
+  document.getElementById('step-sub').textContent=STEPS[n].sub;
+  window.scrollTo(0,0);
+}
+
+function next(from){
+  if(from===0){if(!rating){document.getElementById('star-err').style.display='block';return;}showStep(1);}
+  else if(from===1){
+    let ok=true;
+    if(!document.getElementById('room-name').value.trim()){document.getElementById('f-room').classList.add('err');ok=false;}else document.getElementById('f-room').classList.remove('err');
+    if(!document.getElementById('prop-select').value){document.getElementById('f-prop').classList.add('err');ok=false;}else document.getElementById('f-prop').classList.remove('err');
+    if(!ok)return;showStep(2);
+  }
+}
+function back(from){showStep(from-1);}
+
+async function loadProps(){
+  try{
+    const res=await fetch(`${SB_URL}/rest/v1/properties?select=id,city,name&active=eq.true&order=city,name`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});
+    if(!res.ok)throw new Error(await res.text());
+    const props=await res.json();
+    usingFallbackProps=false;
+    renderProperties(props);
+    applyLockedProperty(props);
+  }catch(e){
+    console.error(e);
+    usingFallbackProps=true;
+    renderProperties(FALLBACK_PROPS);
+    applyLockedProperty(FALLBACK_PROPS);
+  }
+}
+
+async function submitReview(){
+  if(!navigator.onLine){alert('No hay conexión a internet. Verifica la red antes de enviar la reseña.');updateFormNote();return;}
+  const btn=document.getElementById('final-btn');btn.disabled=true;btn.textContent='Enviando...';
+  document.getElementById('loader').classList.add('show');
+  syncLockedProperty();
+  const payload={property_id:document.getElementById('prop-select').value||null,guest_name:document.getElementById('guest-name').value.trim()||'Huésped anónimo',room_name:document.getElementById('room-name').value.trim(),rating,comment:document.getElementById('comment').value.trim()||null,would_return:wouldReturn,source:SOURCE};
+  try{
+    const res=await fetch(`${SB_URL}/rest/v1/reviews`,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(res.ok||res.status===201){showSuccess();}else throw new Error(await res.text());
+  }catch(e){console.error(e);alert('Hubo un error al enviar la reseña. Intenta de nuevo en unos momentos.');btn.disabled=false;btn.textContent='Enviar reseña ✓';}
+  finally{document.getElementById('loader').classList.remove('show');}
+}
+
+function showSuccess(){
+  clearResetTimers();
+  [0,1,2].forEach(i=>document.getElementById('step'+i).style.display='none');
+  document.getElementById('success').style.display='block';
+  document.querySelectorAll('.sdot').forEach(d=>d.className='sdot done');
+  document.getElementById('step-title').textContent='¡Reseña enviada!';
+  document.getElementById('step-sub').textContent='Muchas gracias por tu tiempo';
+  const resetEl=document.getElementById('success-reset');
+  if(SHOULD_AUTO_RESET){
+    let secondsLeft=AUTO_RESET_SECONDS;
+    resetEl.style.display='block';
+    resetEl.textContent=`Esta pantalla se reiniciará automáticamente en ${secondsLeft}s.`;
+    autoResetCountdown=setInterval(()=>{
+      secondsLeft-=1;
+      if(secondsLeft>0)resetEl.textContent=`Esta pantalla se reiniciará automáticamente en ${secondsLeft}s.`;
+    },1000);
+    autoResetTimer=setTimeout(reset,AUTO_RESET_SECONDS*1000);
+  }else{
+    resetEl.style.display='none';
+    resetEl.textContent='';
+  }
+}
+
+function reset(){
+  clearResetTimers();
+  rating=0;wouldReturn=null;
+  const finalBtn=document.getElementById('final-btn');
+  document.querySelectorAll('.star-btn').forEach(b=>b.classList.remove('lit'));
+  ['guest-name','room-name','comment'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('prop-select').value='';
+  document.getElementById('btn-yes').className='ret-btn';
+  document.getElementById('btn-no').className='ret-btn';
+  finalBtn.disabled=false;
+  finalBtn.textContent='Enviar reseña ✓';
+  document.getElementById('star-err').style.display='none';
+  document.getElementById('success').style.display='none';
+  document.getElementById('success-reset').style.display='none';
+  document.getElementById('success-reset').textContent='';
+  document.getElementById('loader').classList.remove('show');
+  document.querySelectorAll('.field.err').forEach(el=>el.classList.remove('err'));
+  syncLockedProperty();
+  showStep(0);
+  updateFormNote();
+}
+
+['room-name','prop-select'].forEach(id=>{document.getElementById(id)?.addEventListener('input',function(){this.closest('.field')?.classList.remove('err');});document.getElementById(id)?.addEventListener('change',function(){this.closest('.field')?.classList.remove('err');});});
+window.addEventListener('online',updateFormNote);
+window.addEventListener('offline',updateFormNote);
+
+loadProps();
+updateFormNote();
+</script>
+</body>
+</html>

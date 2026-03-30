@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Homi — Dashboard de Reviews</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy:       #0b1c33;
+  --navy2:      #0f2440;
+  --navy3:      #142d4e;
+  --navy4:      #1a3560;
+  --navy5:      #213f70;
+  --green:      #10493a;
+  --green-acc:  #4ADE80;
+  --green-mid:  #22c55e;
+  --white:      #ffffff;
+  --text:       #e8f0fe;
+  --text2:      #8baac8;
+  --text3:      #4a6a8a;
+  --border:     rgba(255,255,255,0.07);
+  --border2:    rgba(255,255,255,0.13);
+  --red:        #f87171;
+  --amber:      #fbbf24;
+  --blue-acc:   #60a5fa;
+  --purple-acc: #a78bfa;
+  --shadow:     0 2px 16px rgba(0,0,0,0.3);
+  --font-head:  'Syne', sans-serif;
+  --font-body:  'DM Sans', sans-serif;
+  --r: 10px; --r2: 14px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:14px; }
+body { min-height:100vh; background:var(--navy); color:var(--text); font-family:var(--font-body); line-height:1.6; }
+
+/* ── SHELL ── */
+.shell { display:none; min-height:100vh; }
+body.auth-ready .shell { display:flex; }
+
+/* ── AUTH ── */
+.auth-screen {
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:28px 18px;
+  background:
+    radial-gradient(circle at top left, rgba(74,222,128,0.12), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(96,165,250,0.15), transparent 30%),
+    linear-gradient(135deg, #081426 0%, #0b1c33 45%, #102541 100%);
+}
+body.auth-ready .auth-screen { display:none; }
+.auth-card {
+  width:100%;
+  max-width:440px;
+  padding:28px;
+  border-radius:26px;
+  border:1px solid var(--border2);
+  background:rgba(15,36,64,0.84);
+  box-shadow:0 22px 80px rgba(0,0,0,0.45);
+  backdrop-filter:blur(14px);
+}
+.auth-brand { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+.auth-word { font-family:var(--font-head); font-size:24px; font-weight:800; letter-spacing:1px; line-height:1; }
+.auth-subword { font-size:11px; color:var(--text3); margin-top:3px; }
+.auth-badge {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border-radius:999px;
+  border:1px solid rgba(74,222,128,0.2);
+  background:rgba(74,222,128,0.09);
+  color:var(--green-acc);
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+  margin-bottom:14px;
+}
+.auth-title { font-family:var(--font-head); font-size:31px; line-height:1; margin-bottom:10px; }
+.auth-copy { color:var(--text2); font-size:14px; line-height:1.8; margin-bottom:20px; }
+.auth-form { display:flex; flex-direction:column; gap:14px; }
+.auth-field { display:flex; flex-direction:column; gap:6px; }
+.auth-label {
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color:var(--text2);
+}
+.auth-input {
+  width:100%;
+  border:none;
+  outline:none;
+  border-radius:14px;
+  padding:14px 15px;
+  font-size:14px;
+  color:var(--text);
+  background:var(--navy3);
+  border:1px solid var(--border2);
+  font-family:var(--font-body);
+}
+.auth-input:focus {
+  border-color:var(--green-acc);
+  box-shadow:0 0 0 3px rgba(74,222,128,0.14);
+}
+.auth-error {
+  display:none;
+  padding:11px 12px;
+  border-radius:12px;
+  background:rgba(248,113,113,0.12);
+  border:1px solid rgba(248,113,113,0.24);
+  color:var(--red);
+  font-size:12px;
+}
+.auth-error.show { display:block; }
+.auth-submit {
+  width:100%;
+  justify-content:center;
+  padding:14px 16px;
+  border-radius:14px;
+  font-size:14px;
+}
+.auth-note {
+  margin-top:18px;
+  color:var(--text3);
+  font-size:12px;
+  line-height:1.7;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width:228px; min-width:228px;
+  background:var(--navy2);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  position:fixed; top:0; left:0; bottom:0; z-index:100;
+}
+.sidebar-logo {
+  padding:22px 20px 18px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+}
+.logo-word { font-family:var(--font-head); font-size:20px; font-weight:800; color:var(--text); letter-spacing:1px; line-height:1; }
+.logo-sub  { font-size:10px; color:var(--text3); letter-spacing:0.4px; margin-top:2px; }
+
+.sidebar-nav { padding:14px 10px; flex:1; overflow-y:auto; }
+.nav-label { font-size:9px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--text3); padding:10px 10px 4px; }
+.nav-item {
+  display:flex; align-items:center; gap:9px;
+  padding:9px 10px; border-radius:9px;
+  cursor:pointer; font-size:13px; color:var(--text2);
+  transition:all 0.15s; margin-bottom:2px; user-select:none;
+}
+.nav-item:hover { background:var(--navy3); color:var(--text); }
+.nav-item.active { background:rgba(74,222,128,0.12); color:var(--green-acc); }
+.nav-item svg { width:15px; height:15px; flex-shrink:0; opacity:0.7; }
+.nav-item.active svg { opacity:1; }
+.nav-badge {
+  margin-left:auto; font-size:10px; font-weight:700;
+  background:var(--green-acc); color:#000;
+  padding:1px 6px; border-radius:10px;
+}
+.sidebar-footer { padding:14px; border-top:1px solid var(--border); }
+.ws-pill { display:flex; align-items:center; gap:9px; padding:9px 11px; background:var(--navy3); border-radius:10px; }
+.ws-av { width:26px; height:26px; border-radius:7px; background:var(--green-acc); display:flex; align-items:center; justify-content:center; font-family:var(--font-head); font-size:11px; font-weight:800; color:#000; flex-shrink:0; }
+.ws-name { font-size:12px; font-weight:500; flex:1; }
+.ws-plan { font-size:10px; background:rgba(74,222,128,0.15); color:var(--green-acc); padding:2px 7px; border-radius:5px; }
+
+/* ── MAIN ── */
+.main { margin-left:228px; flex:1; display:flex; flex-direction:column; min-height:100vh; }
+
+/* ── TOPBAR ── */
+.topbar {
+  background:var(--navy2);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center;
+  padding:10px 26px; gap:8px;
+  position:sticky; top:0; z-index:50;
+  backdrop-filter:blur(12px);
+  flex-wrap:wrap; min-height:58px;
+}
+.topbar-title { font-family:var(--font-head); font-size:15px; font-weight:700; color:var(--text); white-space:nowrap; }
+
+/* DATE PILLS */
+.date-pills { display:flex; gap:3px; }
+.dpill {
+  padding:5px 12px; border-radius:20px;
+  font-size:12px; font-weight:500; cursor:pointer;
+  border:1px solid var(--border2); background:transparent;
+  color:var(--text2); transition:all 0.15s;
+  font-family:var(--font-body); white-space:nowrap;
+}
+.dpill:hover { background:var(--navy3); color:var(--text); border-color:var(--border2); }
+.dpill.active { background:var(--green-acc); color:#000; border-color:var(--green-acc); }
+
+/* CUSTOM RANGE */
+.crange { display:none; align-items:center; gap:6px; }
+.crange.show { display:flex; }
+.dinput {
+  background:var(--navy3); border:1px solid var(--border2);
+  border-radius:8px; padding:5px 9px;
+  font-family:var(--font-body); font-size:12px;
+  color:var(--text); outline:none; cursor:pointer;
+}
+.dinput:focus { border-color:var(--green-acc); }
+.dinput::-webkit-calendar-picker-indicator { filter:invert(0.6); cursor:pointer; }
+.dsep { font-size:11px; color:var(--text3); }
+.dapply {
+  padding:5px 12px; background:var(--green-acc); color:#000;
+  border:none; border-radius:8px;
+  font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body);
+}
+.dapply:hover { background:#6ee7a0; }
+
+.pchip { font-size:11px; color:var(--text3); background:var(--navy3); border:1px solid var(--border); padding:3px 10px; border-radius:6px; white-space:nowrap; }
+.topbar-right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.live-dot { display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--green-acc); }
+.pulse { width:7px; height:7px; border-radius:4px; background:var(--green-acc); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,0.4)} 50%{box-shadow:0 0 0 5px rgba(74,222,128,0)} }
+.user-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:5px 10px;
+  border-radius:999px;
+  background:var(--navy3);
+  border:1px solid var(--border);
+  color:var(--text2);
+  font-size:11px;
+}
+.user-dot {
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--green-acc);
+  box-shadow:0 0 0 4px rgba(74,222,128,0.12);
+}
+
+/* BUTTONS */
+.btn { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border-radius:9px; font-family:var(--font-body); font-size:12px; font-weight:500; cursor:pointer; border:none; transition:all 0.15s; }
+.btn-ghost { background:transparent; color:var(--text2); border:1px solid var(--border2); }
+.btn-ghost:hover { background:var(--navy3); color:var(--text); }
+.btn-primary { background:var(--green-acc); color:#000; font-weight:600; }
+.btn-primary:hover { background:#6ee7a0; }
+.btn-sm { padding:5px 11px; font-size:11px; }
+
+/* PAGES */
+.page { padding:24px 28px; display:none; }
+.page.active { display:block; }
+.phdr { margin-bottom:20px; }
+.phead { font-family:var(--font-head); font-size:20px; font-weight:700; margin-bottom:2px; }
+.psub { font-size:12px; color:var(--text3); }
+
+/* STAT CARDS */
+.stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+.scard { background:var(--navy2); border:1px solid var(--border); border-radius:var(--r2); padding:18px 20px; position:relative; overflow:hidden; }
+.scard::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.scard.g::after { background:var(--green-acc); }
+.scard.b::after { background:var(--blue-acc); }
+.scard.a::after { background:var(--amber); }
+.scard.r::after { background:var(--red); }
+.slabel { font-size:10px; font-weight:600; color:var(--text3); letter-spacing:0.6px; text-transform:uppercase; margin-bottom:6px; }
+.sval { font-family:var(--font-head); font-size:28px; font-weight:800; line-height:1; }
+.ssub { font-size:11px; color:var(--text3); margin-top:4px; }
+
+/* CARDS */
+.card { background:var(--navy2); border:1px solid var(--border); border-radius:var(--r2); padding:18px; }
+.ch { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.ct { font-family:var(--font-head); font-size:13px; font-weight:700; color:var(--text); }
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+.g3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.sep { height:1px; background:var(--border); margin:14px 0; }
+
+/* LINKS */
+.link-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+.link-card {
+  background:var(--navy3);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:16px;
+}
+.link-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.link-city {
+  font-size:10px;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:0.6px;
+  margin-bottom:3px;
+}
+.link-name { font-size:16px; font-weight:700; color:var(--text); line-height:1.2; }
+.link-pill {
+  flex-shrink:0;
+  font-size:10px;
+  font-weight:700;
+  padding:4px 8px;
+  border-radius:999px;
+  background:rgba(74,222,128,0.1);
+  color:var(--green-acc);
+  border:1px solid rgba(74,222,128,0.15);
+}
+.link-meta { font-size:11px; color:var(--text3); margin-bottom:10px; }
+.link-url {
+  font-size:11px;
+  color:var(--text2);
+  line-height:1.6;
+  padding:10px 12px;
+  border-radius:11px;
+  background:rgba(11,28,51,0.55);
+  border:1px solid var(--border);
+  word-break:break-all;
+  margin-bottom:12px;
+}
+.link-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.link-stack { display:flex; flex-direction:column; gap:10px; }
+.link-row {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  padding:12px 0;
+  border-bottom:1px solid var(--border);
+}
+.link-row:last-child { border-bottom:none; padding-bottom:0; }
+.link-row:first-child { padding-top:0; }
+.link-row-copy { flex:1; min-width:0; }
+.link-row-title { font-size:13px; font-weight:600; color:var(--text); margin-bottom:3px; }
+.link-row-sub { font-size:11px; color:var(--text3); line-height:1.6; word-break:break-all; }
+.link-tips { display:flex; flex-direction:column; gap:10px; }
+.link-tip {
+  padding:12px 14px;
+  border-radius:12px;
+  background:var(--navy3);
+  border:1px solid var(--border);
+  font-size:12px;
+  color:var(--text2);
+  line-height:1.7;
+}
+.link-tip strong { color:var(--text); }
+
+/* FILTERS */
+.fbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.fsel { background:var(--navy3); border:1px solid var(--border2); border-radius:8px; padding:6px 10px; font-family:var(--font-body); font-size:12px; color:var(--text); outline:none; cursor:pointer; }
+.fsel:focus { border-color:var(--green-acc); }
+
+/* TABLE */
+.rtable { width:100%; border-collapse:collapse; }
+.rtable th { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text3); padding:8px 12px; border-bottom:1px solid var(--border); text-align:left; white-space:nowrap; background:var(--navy3); }
+.rtable td { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:12px; color:var(--text2); vertical-align:middle; }
+.rtable tr:last-child td { border-bottom:none; }
+.rtable tr:hover td { background:rgba(255,255,255,0.03); }
+
+/* BADGES */
+.abadge { background:rgba(248,113,113,0.15); color:var(--red); border:1px solid rgba(248,113,113,0.25); font-size:10px; font-weight:700; padding:2px 6px; border-radius:5px; }
+.stag { font-size:10px; background:var(--navy3); color:var(--text3); padding:2px 6px; border-radius:4px; }
+.tag { display:inline-flex; font-size:11px; padding:2px 7px; border-radius:4px; font-weight:500; }
+.tg { background:rgba(74,222,128,0.1); color:var(--green-acc); }
+.ta { background:rgba(251,191,36,0.1); color:var(--amber); }
+.tr { background:rgba(248,113,113,0.1); color:var(--red); }
+
+/* BARS */
+.brow { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.blbl { width:22px; color:var(--text3); text-align:center; font-size:11px; }
+.btrack { flex:1; height:6px; background:var(--navy4); border-radius:3px; overflow:hidden; }
+.bfill { height:100%; border-radius:3px; transition:width 0.5s; }
+.bcnt { width:26px; text-align:right; color:var(--text3); font-size:11px; }
+
+/* PERF */
+.prow { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+.prow:last-child { border-bottom:none; }
+.pcity { width:66px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.3px; }
+.pname { flex:1; font-size:13px; color:var(--text); font-weight:500; }
+.pbar { width:80px; height:4px; background:var(--navy4); border-radius:2px; overflow:hidden; }
+.pbfill { height:100%; border-radius:2px; }
+.pcnt { font-size:11px; color:var(--text3); width:56px; text-align:right; }
+.pscore { font-family:var(--font-head); font-size:15px; font-weight:800; width:34px; text-align:right; }
+
+/* EMPTY */
+.empty { text-align:center; padding:36px 20px; color:var(--text3); font-size:13px; }
+.ei { font-size:28px; margin-bottom:8px; }
+
+/* NOTIF */
+.nstack { position:fixed; bottom:20px; right:20px; z-index:300; display:flex; flex-direction:column; gap:8px; }
+.notif { display:flex; align-items:center; gap:10px; background:var(--navy3); border:1px solid var(--border2); border-radius:11px; padding:12px 16px; font-size:13px; min-width:230px; animation:sin 0.2s ease; box-shadow:0 8px 28px rgba(0,0,0,0.5); }
+@keyframes sin { from{transform:translateX(36px);opacity:0} to{transform:translateX(0);opacity:1} }
+
+/* QR MODAL */
+.qr-modal {
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(5,14,28,0.72);
+  backdrop-filter:blur(6px);
+  z-index:280;
+}
+.qr-modal.show { display:flex; }
+.qr-dialog {
+  width:min(920px,100%);
+  background:var(--navy2);
+  border:1px solid var(--border2);
+  border-radius:24px;
+  box-shadow:0 24px 80px rgba(0,0,0,0.45);
+  overflow:hidden;
+}
+.qr-top {
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:flex-start;
+  padding:20px 22px 16px;
+  border-bottom:1px solid var(--border);
+}
+.qr-city {
+  font-size:10px;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:0.08em;
+  margin-bottom:4px;
+}
+.qr-title {
+  font-family:var(--font-head);
+  font-size:24px;
+  line-height:1;
+  margin-bottom:8px;
+}
+.qr-copy {
+  color:var(--text2);
+  font-size:13px;
+  line-height:1.7;
+}
+.qr-close {
+  width:38px;
+  height:38px;
+  border-radius:12px;
+  border:1px solid var(--border2);
+  background:transparent;
+  color:var(--text2);
+  cursor:pointer;
+  font-size:18px;
+}
+.qr-close:hover { background:var(--navy3); color:var(--text); }
+.qr-body {
+  display:grid;
+  grid-template-columns:320px 1fr;
+  gap:20px;
+  padding:22px;
+}
+.qr-box {
+  background:linear-gradient(180deg,#ffffff 0%, #f3f8ff 100%);
+  border-radius:22px;
+  padding:16px;
+  min-height:320px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid rgba(11,28,51,0.08);
+}
+.qr-box img {
+  display:block;
+  width:100%;
+  max-width:260px;
+  height:auto;
+  border-radius:14px;
+}
+.qr-side { display:flex; flex-direction:column; gap:14px; }
+.qr-label {
+  font-size:10px;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:0.08em;
+  margin-bottom:6px;
+}
+.qr-url-panel {
+  background:var(--navy3);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:14px;
+}
+.qr-url {
+  font-size:12px;
+  color:var(--text2);
+  line-height:1.7;
+  word-break:break-all;
+}
+.qr-side-actions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.qr-tip-box {
+  padding:14px;
+  border-radius:16px;
+  background:rgba(74,222,128,0.08);
+  border:1px solid rgba(74,222,128,0.12);
+  font-size:12px;
+  color:var(--text2);
+  line-height:1.7;
+}
+.qr-tip-box strong { color:var(--text); }
+
+@media (max-width: 1080px) {
+  .stat-grid { grid-template-columns:repeat(2,1fr); }
+  .g3 { grid-template-columns:repeat(2,1fr); }
+  .link-grid { grid-template-columns:1fr; }
+}
+
+@media (max-width: 860px) {
+  .sidebar { position:static; width:100%; min-width:0; border-right:none; border-bottom:1px solid var(--border); }
+  .main { margin-left:0; }
+  .shell { flex-direction:column; }
+  .g2, .g3, .stat-grid { grid-template-columns:1fr; }
+  .qr-body { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <svg width="42" height="42" viewBox="0 0 34 34" fill="none">
+        <rect width="34" height="34" rx="8" fill="#10493a"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M7 9.8C7 8.25 8.25 7 9.8 7H13.6C15.15 7 16.4 8.25 16.4 9.8V13.2H17.6V9.8C17.6 8.25 18.85 7 20.4 7H24.2C25.75 7 27 8.25 27 9.8V24.2C27 25.75 25.75 27 24.2 27H20.4C18.85 27 17.6 25.75 17.6 24.2V21.4L17 20.8L16.4 21.4V24.2C16.4 25.75 15.15 27 13.6 27H9.8C8.25 27 7 25.75 7 24.2V9.8Z" fill="white"/>
+        <path d="M13 18.5L17 15L21 18.5" stroke="#10493a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <div>
+        <div class="auth-word">HOMI</div>
+        <div class="auth-subword">Centro de Reviews</div>
+      </div>
+    </div>
+    <div class="auth-badge">Acceso Interno</div>
+    <div class="auth-title">Dashboard protegido</div>
+    <div class="auth-copy">Inicia sesión para consultar reviews, analytics y alertas del equipo de soporte.</div>
+    <form class="auth-form" id="auth-form">
+      <div class="auth-field">
+        <label class="auth-label" for="auth-user">Usuario</label>
+        <input class="auth-input" id="auth-user" type="text" autocomplete="username" placeholder="Ingresa tu usuario">
+      </div>
+      <div class="auth-field">
+        <label class="auth-label" for="auth-pass">Contraseña</label>
+        <input class="auth-input" id="auth-pass" type="password" autocomplete="current-password" placeholder="Ingresa tu contraseña">
+      </div>
+      <div class="auth-error" id="auth-error"></div>
+      <button class="btn btn-primary auth-submit" id="auth-submit" type="submit">Entrar al dashboard</button>
+    </form>
+    <div class="auth-note">Esta capa es una proteccion simple en frontend para uso interno. Antes de compartir el dashboard fuera del equipo, conviene moverlo a autenticacion real.</div>
+  </div>
+</div>
+<div class="shell">
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+      <rect width="34" height="34" rx="8" fill="#10493a"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M7 9.8C7 8.25 8.25 7 9.8 7H13.6C15.15 7 16.4 8.25 16.4 9.8V13.2H17.6V9.8C17.6 8.25 18.85 7 20.4 7H24.2C25.75 7 27 8.25 27 9.8V24.2C27 25.75 25.75 27 24.2 27H20.4C18.85 27 17.6 25.75 17.6 24.2V21.4L17 20.8L16.4 21.4V24.2C16.4 25.75 15.15 27 13.6 27H9.8C8.25 27 7 25.75 7 24.2V9.8Z" fill="white"/>
+      <path d="M13 18.5L17 15L21 18.5" stroke="#10493a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+    <div>
+      <div class="logo-word">HOMI</div>
+      <div class="logo-sub">Centro de Reviews</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">Overview</div>
+    <div class="nav-item active" onclick="nav('dashboard')">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 7a1 1 0 011-1h3a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zm7-7a1 1 0 011-1h3a1 1 0 011 1v6a1 1 0 01-1 1h-3a1 1 0 01-1-1V4zm0 10a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3z"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="nav('reviews')">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2z" clip-rule="evenodd"/></svg>
+      Todas las Reviews
+      <span id="nbadge" class="nav-badge" style="display:none"></span>
+    </div>
+    <div class="nav-label">Analytics</div>
+    <div class="nav-item" onclick="nav('analytics')">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-4a1 1 0 011-1h2a1 1 0 011 1v13a1 1 0 01-1 1h-2a1 1 0 01-1-1V3z"/></svg>
+      Por Complejo
+    </div>
+    <div class="nav-label">Herramientas</div>
+    <div class="nav-item" onclick="nav('links')">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M12.59 7.41a2 2 0 012.82 0l1.18 1.18a2 2 0 010 2.82l-3 3a2 2 0 01-2.82 0 .75.75 0 111.06-1.06.5.5 0 00.7 0l3-3a.5.5 0 000-.7l-1.18-1.18a.5.5 0 00-.7 0l-1.06 1.06a.75.75 0 11-1.06-1.06l1.06-1.06z"/><path d="M7.41 12.59a2 2 0 01-2.82 0l-1.18-1.18a2 2 0 010-2.82l3-3a2 2 0 012.82 0 .75.75 0 11-1.06 1.06.5.5 0 00-.7 0l-3 3a.5.5 0 000 .7l1.18 1.18a.5.5 0 00.7 0l1.06-1.06a.75.75 0 111.06 1.06l-1.06 1.06z"/><path d="M6.97 13.03a.75.75 0 010-1.06l5-5a.75.75 0 111.06 1.06l-5 5a.75.75 0 01-1.06 0z"/></svg>
+      Links por Complejo
+    </div>
+    <div class="nav-item" onclick="openForm()">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+      Abrir Formulario
+    </div>
+    <div class="nav-item" onclick="copyLink()">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>
+      Copiar Link
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="ws-pill">
+      <div class="ws-av">H</div>
+      <span class="ws-name">Homi rent</span>
+      <span class="ws-plan">Interno</span>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="ttitle">Dashboard</div>
+    <div class="date-pills">
+      <button class="dpill" onclick="setPreset(this,'today')">Hoy</button>
+      <button class="dpill active" onclick="setPreset(this,'7d')">7 días</button>
+      <button class="dpill" onclick="setPreset(this,'30d')">30 días</button>
+      <button class="dpill" onclick="setPreset(this,'custom')">Personalizado</button>
+    </div>
+    <div class="crange" id="crange">
+      <input type="date" class="dinput" id="dfrom">
+      <span class="dsep">—</span>
+      <input type="date" class="dinput" id="dto">
+      <button class="dapply" onclick="applyCustom()">Aplicar</button>
+    </div>
+    <span class="pchip" id="pchip">Últimos 7 días</span>
+    <div class="topbar-right">
+      <div class="user-chip"><span class="user-dot"></span><span id="auth-chip-name">admin</span></div>
+      <div class="live-dot"><span class="pulse"></span>En vivo</div>
+      <button class="btn btn-ghost btn-sm" onclick="refresh()">↻</button>
+      <button class="btn btn-primary btn-sm" onclick="openForm()">Formulario ↗</button>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Salir</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="stat-grid">
+      <div class="scard g"><div class="slabel">Rating Promedio</div><div class="sval" id="savg" style="color:var(--green-acc)">—</div><div class="ssub" id="savgsub">—</div></div>
+      <div class="scard b"><div class="slabel">Total Reviews</div><div class="sval" id="stotal" style="color:var(--blue-acc)">—</div><div class="ssub">en el periodo</div></div>
+      <div class="scard a"><div class="slabel">Regresarían</div><div class="sval" id="sreturn" style="color:var(--amber)">—</div><div class="ssub">de los que respondieron</div></div>
+      <div class="scard r"><div class="slabel">Alertas</div><div class="sval" id="salerts" style="color:var(--text3)">—</div><div class="ssub">ratings 1–2 estrellas</div></div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="ch"><div class="ct">Reviews Recientes</div><button class="btn btn-ghost btn-sm" onclick="nav('reviews')">Ver todas →</button></div>
+        <div id="rrecent"><div class="empty"><div class="ei">⏳</div>Cargando...</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="card"><div class="ch"><div class="ct">Distribución de Ratings</div></div><div id="rdist"></div></div>
+        <div class="card"><div class="ch"><div class="ct">⚠ Alertas — Rating Bajo</div></div><div id="ralerts"><div style="font-size:12px;color:var(--text3)">✅ Sin alertas</div></div></div>
+      </div>
+    </div>
+    <div class="card"><div class="ch"><div class="ct">Rendimiento por Complejo</div></div><div id="rperf"><div class="empty"><div class="ei">⏳</div>Cargando...</div></div></div>
+  </div>
+
+  <!-- REVIEWS -->
+  <div class="page" id="page-reviews">
+    <div class="phdr" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="phead">Todas las Reviews</div><div class="psub" id="rcountlbl">Cargando...</div></div>
+      <div class="fbar">
+        <select class="fsel" id="fcity" onchange="applyTableFilters()"><option value="">Todas las ciudades</option><option>Querétaro</option><option>Ciudad de México</option><option>Mérida</option></select>
+        <select class="fsel" id="fprop" onchange="applyTableFilters()"><option value="">Todos los complejos</option></select>
+        <select class="fsel" id="frating" onchange="applyTableFilters()"><option value="">Todos los ratings</option><option value="5">⭐⭐⭐⭐⭐ 5</option><option value="4">⭐⭐⭐⭐ 4</option><option value="3">⭐⭐⭐ 3</option><option value="low">⭐⭐ 2 o menos</option></select>
+        <button class="btn btn-ghost btn-sm" onclick="exportCsv()">Export CSV</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px;overflow-x:auto;padding:0">
+      <table class="rtable">
+        <thead><tr><th>Huésped</th><th>Habitación</th><th>Complejo</th><th>Ciudad</th><th>Rating</th><th>Comentario</th><th>Regresa</th><th>Fuente</th><th>Fecha</th></tr></thead>
+        <tbody id="rtbody"><tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text3)">⏳ Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div class="page" id="page-analytics">
+    <div class="phdr"><div class="phead">Analytics por Complejo</div><div class="psub" id="asub">Cargando...</div></div>
+    <div id="acards" class="g3"></div>
+  </div>
+
+  <!-- LINKS -->
+  <div class="page" id="page-links">
+    <div class="phdr" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div>
+        <div class="phead">Links por Complejo</div>
+        <div class="psub" id="lsub">Cargando complejos...</div>
+      </div>
+      <div class="fbar">
+        <div id="lcityprints" class="fbar"></div>
+        <button class="btn btn-ghost btn-sm" onclick="printAllQrs()">Imprimir todos los QR</button>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="ch"><div class="ct">Links Generales</div></div>
+        <div class="link-stack" id="lgeneric"></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Cómo Usarlos</div></div>
+        <div class="link-tips">
+          <div class="link-tip"><strong>Formulario general:</strong> úsalo para compartir por mensaje o cuando recepción no necesite fijar un complejo.</div>
+          <div class="link-tip"><strong>Link iPad:</strong> deja el complejo bloqueado y activa auto-reset para operación continua en recepción.</div>
+          <div class="link-tip"><strong>Link QR o WhatsApp:</strong> mantiene la propiedad preseleccionada, pero cambia el `source` para medir mejor el origen de cada review.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">Biblioteca Operativa</div><button class="btn btn-ghost btn-sm" onclick="copyLink()">Copiar link general</button></div>
+      <div id="lgrid" class="link-grid"><div class="empty"><div class="ei">⏳</div>Cargando complejos...</div></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<div class="nstack" id="nstack"></div>
+<div class="qr-modal" id="qr-modal" onclick="closeQrModal(event)">
+  <div class="qr-dialog">
+    <div class="qr-top">
+      <div>
+        <div class="qr-city" id="qr-modal-city">Ciudad</div>
+        <div class="qr-title" id="qr-modal-title">Complejo</div>
+        <div class="qr-copy">Este QR abre el formulario ya configurado para esa propiedad y registra la fuente como <strong>qr</strong>.</div>
+      </div>
+      <button class="qr-close" type="button" onclick="closeQrModal(event)">×</button>
+    </div>
+    <div class="qr-body">
+      <div class="qr-box">
+        <img id="qr-modal-image" alt="QR del complejo">
+      </div>
+      <div class="qr-side">
+        <div class="qr-url-panel">
+          <div class="qr-label">Link del QR</div>
+          <div class="qr-url" id="qr-modal-link"></div>
+        </div>
+        <div class="qr-side-actions">
+          <button class="btn btn-primary" type="button" onclick="copyActiveQrLink()">Copiar link QR</button>
+          <button class="btn btn-ghost" type="button" onclick="openActiveQrForm()">Abrir formulario</button>
+          <button class="btn btn-ghost" type="button" onclick="downloadActiveQr()">Descargar PNG</button>
+          <button class="btn btn-ghost" type="button" onclick="openActiveQrImage()">Abrir PNG</button>
+          <button class="btn btn-ghost" type="button" onclick="printActiveQr()">Imprimir</button>
+        </div>
+        <div class="qr-tip-box">
+          <strong>Sugerencia operativa:</strong> imprime este QR para recepción o para el interior del complejo. Para iPads, usa el botón <strong>Copiar iPad</strong> de la tarjeta del complejo.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SB_URL='https://kmzooracfzxmhtabenax.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imttem9vcmFjZnp4bWh0YWJlbmF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MzY4ODcsImV4cCI6MjA5MDExMjg4N30.vCiEFwuSeWoEN8puAP-9JQ-ua6UDXHEMsqL0tlx3gGc';
+const FORM_URL='form.html';
+const AUTH_USER='admin';
+const AUTH_HASH='a1c9242db87c2a5eddcbe2d90454822297a7c5e84cea7f7a2d3dbc82ffefa21c';
+const AUTH_STORAGE_KEY='homi_reviews_dashboard_auth_v1';
+let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[];
+const AVC=['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#f87171'];
+
+async function sb(path){const r=await fetch(`${SB_URL}/rest/v1/${path}`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sha256Hex(value){const data=new TextEncoder().encode(value);const digest=await crypto.subtle.digest('SHA-256',data);return Array.from(new Uint8Array(digest)).map(v=>v.toString(16).padStart(2,'0')).join('');}
+function readAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||'null');}catch(e){return null;}}
+function persistAuthSession(username){localStorage.setItem(AUTH_STORAGE_KEY,JSON.stringify({username,granted:true,at:Date.now()}));}
+function clearAuthSession(){localStorage.removeItem(AUTH_STORAGE_KEY);}
+function setAuthError(msg=''){const el=document.getElementById('auth-error');el.textContent=msg;el.classList.toggle('show',!!msg);}
+function setAuthBusy(isBusy){const btn=document.getElementById('auth-submit');btn.disabled=isBusy;btn.textContent=isBusy?'Validando acceso...':'Entrar al dashboard';}
+function showAuthScreen(){document.body.classList.remove('auth-ready');document.getElementById('auth-form').reset();setAuthError('');setAuthBusy(false);setTimeout(()=>document.getElementById('auth-user').focus(),40);}
+function startAutoRefresh(){if(refreshTimer)return;refreshTimer=setInterval(()=>{if(authReady)loadAll();},60000);}
+function unlockDashboard(username,shouldPersist=true){authReady=true;document.body.classList.add('auth-ready');document.getElementById('auth-chip-name').textContent=username;setAuthError('');if(shouldPersist)persistAuthSession(username);startAutoRefresh();loadAll();}
+async function handleAuthSubmit(ev){ev.preventDefault();setAuthError('');setAuthBusy(true);const username=document.getElementById('auth-user').value.trim();const password=document.getElementById('auth-pass').value;try{const digest=await sha256Hex(`${username}::${password}`);if(username===AUTH_USER&&digest===AUTH_HASH){unlockDashboard(username,true);}else{setAuthError('Usuario o contraseña incorrectos.');document.getElementById('auth-pass').select();}}catch(e){console.error(e);setAuthError('No se pudo validar el acceso en este navegador.');}finally{setAuthBusy(false);}}
+function initAuth(){document.getElementById('auth-form').addEventListener('submit',handleAuthSubmit);const session=readAuthSession();if(session?.granted&&session.username===AUTH_USER){unlockDashboard(session.username,false);return;}showAuthScreen();}
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function formUrl(opts={}){
+  const {source='form',propertyId=''}=opts;
+  const url=new URL(FORM_URL,window.location.href);
+  if(source&&source!=='form')url.searchParams.set('source',source);
+  if(propertyId)url.searchParams.set('property',propertyId);
+  return url.toString();
+}
+function qrImageUrl(text,size=320){return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=16&format=png&data=${encodeURIComponent(text)}`;}
+function fileSlug(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
+function downloadFile(filename,content,mime){
+  const blob=new Blob([content],{type:mime});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function csvCell(v){
+  const value=v===null||v===undefined?'':String(v);
+  return `"${value.replace(/"/g,'""')}"`;
+}
+function currentDateLabel(){
+  const chip=document.getElementById('pchip')?.textContent?.trim()||'periodo';
+  return fileSlug(chip||'periodo');
+}
+function fallbackCopyText(text){
+  const ta=document.createElement('textarea');
+  ta.value=text;
+  ta.setAttribute('readonly','');
+  ta.style.position='fixed';
+  ta.style.opacity='0';
+  ta.style.pointerEvents='none';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  ta.remove();
+}
+async function copyText(text,msg){
+  try{
+    if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);
+    else fallbackCopyText(text);
+    notify('📋',msg);
+  }catch(e){
+    try{fallbackCopyText(text);notify('📋',msg);}
+    catch(err){console.error(err);notify('⚠️','No se pudo copiar automáticamente');}
+  }
+}
+function copyGenericLink(source='form'){const label=source==='form'?'general':source.toUpperCase();copyText(formUrl({source}),`Link ${label} copiado`);}
+function copyPropertyLink(propertyId,source='ipad'){
+  const prop=propMap[propertyId];
+  const labels={ipad:'iPad',qr:'QR',whatsapp:'WhatsApp'};
+  copyText(formUrl({source,propertyId}),`Link ${labels[source]||source}${prop?` de ${prop.name}`:''} copiado`);
+}
+function openPropertyLink(propertyId,source='ipad'){window.open(formUrl({source,propertyId}),'_blank');}
+async function downloadQrPng(propertyId){
+  const prop=propMap[propertyId];
+  if(!prop)return;
+  const qrLink=formUrl({source:'qr',propertyId});
+  const fileName=`homi-qr-${fileSlug(prop.city)}-${fileSlug(prop.name)}.png`;
+  try{
+    const res=await fetch(qrImageUrl(qrLink,1080),{mode:'cors'});
+    if(!res.ok)throw new Error(`QR ${res.status}`);
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    notify('⬇️',`PNG descargado: ${prop.name}`);
+  }catch(e){
+    console.error(e);
+    window.open(qrImageUrl(qrLink,1080),'_blank');
+    notify('↗️','Abrí el PNG en una pestaña nueva');
+  }
+}
+function printableQrCard(prop){
+  const link=formUrl({source:'qr',propertyId:prop.id});
+  return `<article style="break-inside:avoid;page-break-inside:avoid;border:1px solid #d8e1ec;border-radius:22px;padding:18px;background:#fff"><div style="font-family:Arial,sans-serif;font-size:22px;font-weight:800;color:#0b1c33;line-height:1.1;margin-bottom:12px">${escapeHtml(prop.name)}</div><div style="display:flex;justify-content:center;margin-bottom:14px"><img src="${qrImageUrl(link,320)}" alt="QR ${escapeHtml(prop.name)}" style="width:220px;height:220px;border:1px solid #edf1f6;border-radius:18px;background:#fff"></div><div style="font-family:Arial,sans-serif;font-size:12px;font-weight:700;color:#0b1c33;margin-bottom:8px">Escanea para abrir el formulario</div><div style="font-family:Arial,sans-serif;font-size:11px;line-height:1.7;color:#486684;word-break:break-all">${escapeHtml(link)}</div></article>`;
+}
+function printableQrMarkup(props){
+  const groups={};
+  props.forEach(prop=>{if(!groups[prop.city])groups[prop.city]=[];groups[prop.city].push(prop);});
+  return Object.keys(groups).sort().map(city=>`<section style="margin-bottom:28px"><div style="font-family:Arial,sans-serif;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#67809e;margin-bottom:10px">${escapeHtml(city)}</div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px">${groups[city].map(printableQrCard).join('')}</div></section>`).join('');
+}
+function openPrintWindow(title,bodyMarkup){
+  const printWindow=window.open('','_blank','noopener,noreferrer,width=1024,height=760');
+  if(!printWindow){notify('⚠️','Permite popups para imprimir los QR');return;}
+  printWindow.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${escapeHtml(title)}</title><style>@page{size:A4;margin:16mm}body{font-family:Arial,sans-serif;background:#f2f5f8;color:#0b1c33;padding:24px}h1{font-size:28px;margin:0 0 8px}p{font-size:13px;color:#557089;line-height:1.7;margin:0 0 18px}section{break-inside:avoid;page-break-inside:avoid}@media print{body{background:#fff;padding:0}article,section{box-shadow:none}}</style></head><body><h1>${escapeHtml(title)}</h1><p>Hoja generada desde el dashboard de Homi Reviews.</p>${bodyMarkup}<script>window.addEventListener('load',()=>{setTimeout(()=>window.print(),250);});<\/script></body></html>`);
+  printWindow.document.close();
+}
+function printPropertyQr(propertyId){
+  const prop=propMap[propertyId];
+  if(!prop)return;
+  openPrintWindow(`QR · ${prop.name}`,printableQrMarkup([prop]));
+}
+function printCityQrs(city){
+  const props=allProps.filter(prop=>prop.city===city);
+  if(!props.length){notify('⚠️','No hay complejos para esa ciudad');return;}
+  openPrintWindow(`QRs · ${city}`,printableQrMarkup(props));
+}
+function printAllQrs(){
+  if(!allProps.length){notify('⚠️','No hay complejos para imprimir');return;}
+  openPrintWindow('QRs por complejo',printableQrMarkup(allProps));
+}
+function showQrModal(propertyId){
+  const prop=propMap[propertyId];
+  if(!prop)return;
+  activeQrPropertyId=propertyId;
+  const link=formUrl({source:'qr',propertyId});
+  document.getElementById('qr-modal-city').textContent=prop.city;
+  document.getElementById('qr-modal-title').textContent=prop.name;
+  document.getElementById('qr-modal-link').textContent=link;
+  const img=document.getElementById('qr-modal-image');
+  img.src=qrImageUrl(link,520);
+  img.alt=`QR de ${prop.name}`;
+  document.getElementById('qr-modal').classList.add('show');
+  document.body.style.overflow='hidden';
+}
+function closeQrModal(ev){
+  if(ev&&ev.target&&ev.target.id!=='qr-modal'&&!ev.target.classList.contains('qr-close'))return;
+  document.getElementById('qr-modal').classList.remove('show');
+  document.body.style.overflow='';
+}
+function copyActiveQrLink(){if(!activeQrPropertyId)return;copyPropertyLink(activeQrPropertyId,'qr');}
+function openActiveQrForm(){if(!activeQrPropertyId)return;openPropertyLink(activeQrPropertyId,'qr');}
+function downloadActiveQr(){if(!activeQrPropertyId)return;downloadQrPng(activeQrPropertyId);}
+function openActiveQrImage(){if(!activeQrPropertyId)return;window.open(qrImageUrl(formUrl({source:'qr',propertyId:activeQrPropertyId}),800),'_blank');}
+function printActiveQr(){if(!activeQrPropertyId)return;printPropertyQr(activeQrPropertyId);}
+function exportCsv(){
+  if(!tableRows.length){notify('⚠️','No hay reviews para exportar');return;}
+  const headers=['guest_name','room_name','property_name','city','rating','comment','would_return','source','created_at'];
+  const lines=[headers.map(csvCell).join(',')];
+  tableRows.forEach(r=>{
+    lines.push([
+      r.guest_name||'Anónimo',
+      r.room_name||'',
+      r.properties?.name||'',
+      r.properties?.city||'',
+      r.rating??'',
+      r.comment||'',
+      r.would_return===true?'Si':r.would_return===false?'No':'',
+      r.source||'form',
+      r.created_at||''
+    ].map(csvCell).join(','));
+  });
+  downloadFile(`homi-reviews-${currentDateLabel()}.csv`,`\uFEFF${lines.join('\n')}`,'text/csv;charset=utf-8;');
+  notify('⬇️',`CSV exportado (${tableRows.length} reviews)`);
+}
+function renderLinks(){
+  const genericEl=document.getElementById('lgeneric');
+  const gridEl=document.getElementById('lgrid');
+  const cityPrintsEl=document.getElementById('lcityprints');
+  const cities=[...new Set(allProps.map(prop=>prop.city))];
+  document.getElementById('lsub').textContent=allProps.length?`${allProps.length} complejos activos listos para compartir`:'Sin complejos activos disponibles';
+  cityPrintsEl.innerHTML=cities.map(city=>`<button class="btn btn-ghost btn-sm" onclick='printCityQrs(${JSON.stringify(city)})'>${escapeHtml(city.replace('Ciudad de México','CDMX'))}</button>`).join('');
+  genericEl.innerHTML=[
+    {title:'Formulario general',sub:formUrl(),action:"copyGenericLink('form')",btn:'Copiar'},
+    {title:'Link genérico para QR',sub:formUrl({source:'qr'}),action:"copyGenericLink('qr')",btn:'Copiar QR'},
+    {title:'Link genérico para WhatsApp',sub:formUrl({source:'whatsapp'}),action:"copyGenericLink('whatsapp')",btn:'Copiar WhatsApp'}
+  ].map(item=>`<div class="link-row"><div class="link-row-copy"><div class="link-row-title">${item.title}</div><div class="link-row-sub">${escapeHtml(item.sub)}</div></div><button class="btn btn-ghost btn-sm" onclick="${item.action}">${item.btn}</button></div>`).join('');
+  if(!allProps.length){gridEl.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ei">🔗</div>Sin complejos activos</div>';return;}
+  gridEl.innerHTML=allProps.map(prop=>`<div class="link-card"><div class="link-head"><div><div class="link-city">${escapeHtml(prop.city.replace('Ciudad de México','CDMX'))}</div><div class="link-name">${escapeHtml(prop.name)}</div></div><span class="link-pill">UUID activo</span></div><div class="link-meta">${escapeHtml(prop.id)}</div><div class="link-url">${escapeHtml(formUrl({source:'ipad',propertyId:prop.id}))}</div><div class="link-actions"><button class="btn btn-primary btn-sm" onclick="copyPropertyLink('${prop.id}','ipad')">Copiar iPad</button><button class="btn btn-ghost btn-sm" onclick="copyPropertyLink('${prop.id}','qr')">Copiar QR</button><button class="btn btn-ghost btn-sm" onclick="copyPropertyLink('${prop.id}','whatsapp')">Copiar WhatsApp</button><button class="btn btn-ghost btn-sm" onclick="showQrModal('${prop.id}')">Ver QR</button><button class="btn btn-ghost btn-sm" onclick="openPropertyLink('${prop.id}','ipad')">Abrir iPad</button></div></div>`).join('');
+}
+
+function setPreset(el,preset){
+  document.querySelectorAll('.dpill').forEach(p=>p.classList.remove('active'));el.classList.add('active');
+  const cr=document.getElementById('crange');
+  if(preset==='custom'){cr.classList.add('show');if(!document.getElementById('dfrom').value){const d=new Date();d.setDate(d.getDate()-7);document.getElementById('dfrom').value=toISO(d);document.getElementById('dto').value=toISO(new Date());}return;}
+  cr.classList.remove('show');dateTo=new Date();
+  if(preset==='today'){dateFrom=new Date();dateFrom.setHours(0,0,0,0);setChip('Hoy');}
+  else if(preset==='7d'){dateFrom=new Date();dateFrom.setDate(dateFrom.getDate()-7);dateFrom.setHours(0,0,0,0);setChip('Últimos 7 días');}
+  else if(preset==='30d'){dateFrom=new Date();dateFrom.setDate(dateFrom.getDate()-30);dateFrom.setHours(0,0,0,0);setChip('Últimos 30 días');}
+  applyDate();
+}
+function applyCustom(){const f=document.getElementById('dfrom').value,t=document.getElementById('dto').value;if(!f||!t){notify('⚠️','Selecciona ambas fechas');return;}dateFrom=new Date(f+'T00:00:00');dateTo=new Date(t+'T23:59:59');const fmt=d=>d.toLocaleDateString('es-MX',{day:'numeric',month:'short'});setChip(`${fmt(dateFrom)} — ${fmt(dateTo)}`);applyDate();notify('📅','Periodo aplicado');}
+function setChip(t){document.getElementById('pchip').textContent=t;}
+function toISO(d){return d.toISOString().split('T')[0];}
+function applyDate(){filtered=allReviews.filter(r=>{const d=new Date(r.created_at);return d>=dateFrom&&d<=dateTo;});renderAll();}
+
+async function loadAll(){
+  if(!authReady)return;
+  try{
+    allProps=await sb('properties?select=id,city,name&active=eq.true&order=city,name');
+    propMap={};allProps.forEach(p=>{propMap[p.id]=p;});buildPropFilter();renderLinks();
+    allReviews=await sb('reviews?select=id,guest_name,room_name,rating,comment,would_return,source,created_at,property_id,properties(name,city)&order=created_at.desc&limit=2000');
+    dateFrom=new Date();dateFrom.setDate(dateFrom.getDate()-7);dateFrom.setHours(0,0,0,0);dateTo=new Date();
+    applyDate();
+    const today=new Date();today.setHours(0,0,0,0);
+    const tc=allReviews.filter(r=>new Date(r.created_at)>=today).length;
+    const b=document.getElementById('nbadge');
+    if(tc>0){b.textContent=tc;b.style.display='inline';}
+    else{b.style.display='none';}
+  }catch(e){console.error(e);notify('❌','Error: '+e.message);}
+}
+function refresh(){if(!authReady)return;loadAll();notify('↻','Actualizando...');}
+function buildPropFilter(){const sel=document.getElementById('fprop');sel.innerHTML='<option value="">Todos los complejos</option>';allProps.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} (${p.city.replace('Ciudad de México','CDMX')})`;sel.appendChild(o);});}
+function renderAll(){renderDash();applyTableFilters();renderAnalytics();renderLinks();}
+
+function rc(n){return n<=2?'var(--red)':n===3?'var(--amber)':'var(--green-acc)';}
+function starsStr(r){const f=Math.round(r);return '★'.repeat(f)+'☆'.repeat(5-f);}
+
+function renderDash(){
+  const r=filtered;
+  if(!r.length){['savg','stotal','sreturn','salerts'].forEach(id=>document.getElementById(id).textContent='—');document.getElementById('savgsub').textContent='Sin datos';document.getElementById('salerts').style.color='var(--text3)';document.getElementById('rrecent').innerHTML='<div class="empty"><div class="ei">📭</div>Sin reviews en este periodo</div>';document.getElementById('rdist').innerHTML='';document.getElementById('ralerts').innerHTML='<div style="font-size:12px;color:var(--text3)">✅ Sin alertas</div>';document.getElementById('rperf').innerHTML='<div class="empty">Sin datos</div>';return;}
+  const avg=r.reduce((s,v)=>s+v.rating,0)/r.length;
+  document.getElementById('savg').textContent=avg.toFixed(1);
+  document.getElementById('savgsub').textContent=starsStr(avg);
+  document.getElementById('stotal').textContent=r.length;
+  const wr=r.filter(v=>v.would_return!==null);
+  const rp=wr.length?Math.round(wr.filter(v=>v.would_return).length/wr.length*100):null;
+  document.getElementById('sreturn').textContent=rp!==null?rp+'%':'—';
+  const ac=r.filter(v=>v.rating<=2).length;
+  const aEl=document.getElementById('salerts');aEl.textContent=ac;aEl.style.color=ac>0?'var(--red)':'var(--text3)';
+  renderRecent(r.slice(0,7));renderDist(r);renderAlerts(r);renderPerf(r);
+}
+
+function renderRecent(reviews){
+  const c=document.getElementById('rrecent');
+  if(!reviews.length){c.innerHTML='<div class="empty"><div class="ei">📭</div>Sin reviews</div>';return;}
+  c.innerHTML=reviews.map((r,i)=>{
+    const init=(r.guest_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const col=AVC[i%AVC.length];const prop=r.properties?.name||'—';const rCol=rc(r.rating);
+    return `<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div style="width:30px;height:30px;border-radius:8px;background:${col}22;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${col};flex-shrink:0">${init}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${r.guest_name||'Anónimo'} <span style="font-weight:400;color:var(--text3);font-size:12px">· ${r.room_name||'—'} · ${prop}</span></div>
+        <div style="font-size:12px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.comment||'Sin comentario'}</div>
+      </div>
+      <div style="font-family:var(--font-head);font-size:15px;font-weight:800;color:${rCol};flex-shrink:0">${r.rating}★</div>
+      <div style="font-size:10px;color:var(--text3);flex-shrink:0">${timeAgo(r.created_at)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderDist(reviews){
+  const counts=[0,0,0,0,0];reviews.forEach(r=>{if(r.rating>=1&&r.rating<=5)counts[r.rating-1]++;});
+  const max=Math.max(...counts,1);
+  document.getElementById('rdist').innerHTML=[5,4,3,2,1].map(s=>{const n=counts[s-1],pct=Math.round(n/max*100);return `<div class="brow"><span class="blbl">${s}★</span><div class="btrack"><div class="bfill" style="width:${pct}%;background:${rc(s)}"></div></div><span class="bcnt">${n}</span></div>`;}).join('');
+}
+
+function renderAlerts(reviews){
+  const alerts=reviews.filter(r=>r.rating<=2).slice(0,6);const c=document.getElementById('ralerts');
+  if(!alerts.length){c.innerHTML='<div style="font-size:12px;color:var(--text3)">✅ Sin alertas en este periodo</div>';return;}
+  c.innerHTML=alerts.map(r=>`<div style="display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid var(--border)"><span class="abadge">⚠ ${r.rating}★</span><span style="font-size:12px;flex:1;color:var(--text2)">${r.guest_name||'Anónimo'} · ${r.room_name||'—'} · ${r.properties?.name||'—'}</span><span style="font-size:10px;color:var(--text3)">${timeAgo(r.created_at)}</span></div>`).join('');
+}
+
+function renderPerf(reviews){
+  const bp={};reviews.forEach(r=>{const k=r.property_id||'?';if(!bp[k])bp[k]={name:r.properties?.name||'—',city:r.properties?.city||'—',ratings:[],count:0};bp[k].ratings.push(r.rating);bp[k].count++;});
+  const props=Object.values(bp).map(p=>({...p,avg:p.ratings.reduce((s,v)=>s+v,0)/p.ratings.length})).sort((a,b)=>b.avg-a.avg);
+  const maxC=Math.max(...props.map(p=>p.count),1);const c=document.getElementById('rperf');
+  if(!props.length){c.innerHTML='<div class="empty">Sin datos</div>';return;}
+  c.innerHTML=props.map(p=>{const col=rc(Math.round(p.avg));return `<div class="prow"><div class="pcity">${p.city.replace('Ciudad de México','CDMX')}</div><div class="pname">${p.name}</div><div class="pbar"><div class="pbfill" style="width:${Math.round(p.count/maxC*100)}%;background:${col}"></div></div><div class="pcnt">${p.count} rev.</div><div class="pscore" style="color:${col}">${p.avg.toFixed(1)}</div></div>`;}).join('');
+}
+
+function applyTableFilters(){
+  const city=document.getElementById('fcity').value,propId=document.getElementById('fprop').value,rating=document.getElementById('frating').value;
+  let rows=filtered;
+  if(city)rows=rows.filter(r=>r.properties?.city===city);
+  if(propId)rows=rows.filter(r=>r.property_id===propId);
+  if(rating==='5')rows=rows.filter(r=>r.rating===5);else if(rating==='4')rows=rows.filter(r=>r.rating===4);else if(rating==='3')rows=rows.filter(r=>r.rating===3);else if(rating==='low')rows=rows.filter(r=>r.rating<=2);
+  tableRows=rows;
+  document.getElementById('rcountlbl').textContent=`${rows.length} reviews en el periodo`;renderTable(rows);
+}
+
+function renderTable(reviews){
+  const tb=document.getElementById('rtbody');
+  if(!reviews.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:28px;color:var(--text3)">Sin reviews para estos filtros</td></tr>';return;}
+  tb.innerHTML=reviews.map(r=>{
+    const prop=r.properties?.name||'—',city=(r.properties?.city||'—').replace('Ciudad de México','CDMX');
+    const rCol=rc(r.rating);const ret=r.would_return===true?'<span class="tag tg">👍 Sí</span>':r.would_return===false?'<span class="tag ta">🤔 No</span>':'—';
+    return `<tr><td style="font-weight:600;color:var(--text)">${r.guest_name||'Anónimo'}</td><td>${r.room_name||'—'}</td><td style="font-weight:500">${prop}</td><td style="font-size:11px;color:var(--text3)">${city}</td><td><span style="font-family:var(--font-head);font-size:14px;font-weight:800;color:${rCol}">${r.rating}★</span>${r.rating<=2?' <span class="abadge">!</span>':''}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.comment||'—'}</td><td>${ret}</td><td><span class="stag">${r.source||'form'}</span></td><td style="white-space:nowrap;font-size:11px;color:var(--text3)">${fmtDate(r.created_at)}</td></tr>`;
+  }).join('');
+}
+
+function renderAnalytics(){
+  document.getElementById('asub').textContent=`${filtered.length} reviews · ${allProps.length} complejos activos`;
+  const bp={};filtered.forEach(r=>{const k=r.property_id||'?';if(!bp[k])bp[k]={name:r.properties?.name||'—',city:r.properties?.city||'—',ratings:[],returns:[],comments:[]};bp[k].ratings.push(r.rating);if(r.would_return!==null)bp[k].returns.push(r.would_return);if(r.comment)bp[k].comments.push(r.comment);});
+  const cards=Object.values(bp).map(p=>({...p,avg:p.ratings.reduce((s,v)=>s+v,0)/p.ratings.length})).sort((a,b)=>b.avg-a.avg);
+  const c=document.getElementById('acards');
+  if(!cards.length){c.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ei">📊</div>Sin datos</div>';return;}
+  c.innerHTML=cards.map(p=>{
+    const col=rc(Math.round(p.avg));const rp=p.returns.length?Math.round(p.returns.filter(v=>v).length/p.returns.length*100):null;
+    const ac=p.ratings.filter(r=>r<=2).length,pc=p.ratings.filter(r=>r===5).length;
+    return `<div class="card" style="border-top:3px solid ${col}"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">${p.city}</div><div style="font-family:var(--font-head);font-size:14px;font-weight:800;color:var(--text);margin-bottom:10px">${p.name}</div><div style="font-family:var(--font-head);font-size:34px;font-weight:800;color:${col};line-height:1">${p.avg.toFixed(1)}</div><div style="font-size:11px;color:var(--text3);margin:3px 0 10px">${p.ratings.length} reviews · ${starsStr(p.avg)}</div>${rp!==null?`<div style="font-size:12px;color:var(--text2);margin-bottom:8px">👍 ${rp}% regresaría</div>`:''}<div style="display:flex;gap:5px;flex-wrap:wrap">${ac?`<span class="tag tr">${ac} alertas</span>`:''}${pc?`<span class="tag tg">${pc} perfectas</span>`:''}</div>${p.comments[0]?`<div style="margin-top:10px;font-size:11px;color:var(--text3);border-top:1px solid var(--border);padding-top:8px;font-style:italic;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">"${p.comments[0]}"</div>`:''}</div>`;
+  }).join('');
+}
+
+const TITLES={dashboard:'Dashboard',reviews:'Todas las Reviews',analytics:'Analytics por Complejo',links:'Links por Complejo'};
+function nav(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('page-'+page).classList.add('active');document.getElementById('ttitle').textContent=TITLES[page]||page;const el=[...document.querySelectorAll('.nav-item')].find(n=>n.getAttribute('onclick')?.includes("'"+page+"'"));if(el)el.classList.add('active');window.scrollTo(0,0);}
+
+function timeAgo(ds){const diff=Date.now()-new Date(ds).getTime();const m=Math.floor(diff/60000),h=Math.floor(m/60),d=Math.floor(h/24);if(m<1)return 'ahora';if(m<60)return `hace ${m}m`;if(h<24)return `hace ${h}h`;return `hace ${d}d`;}
+function fmtDate(ds){return new Date(ds).toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
+function notify(icon,msg){const s=document.getElementById('nstack');const el=document.createElement('div');el.className='notif';el.innerHTML=`<span>${icon}</span><span>${msg}</span>`;s.appendChild(el);setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity 0.3s';setTimeout(()=>el.remove(),300);},3200);}
+function openForm(){window.open(FORM_URL,'_blank');}
+function copyLink(){copyText(formUrl(), 'Link general copiado');}
+function logout(){authReady=false;allReviews=[];filtered=[];allProps=[];propMap={};activeQrPropertyId='';tableRows=[];clearAuthSession();if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}document.getElementById('nbadge').style.display='none';closeQrModal({target:{id:'qr-modal'}});showAuthScreen();}
+
+window.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeQrModal({target:{id:'qr-modal'}});});
+initAuth();
+</script>
+</body>
+</html>

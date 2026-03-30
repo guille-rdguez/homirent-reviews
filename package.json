@@ -1,0 +1,11 @@
+{
+  "name": "homirent-reviews",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Servidor local simple para el proyecto homirent.reviews",
+  "scripts": {
+    "dev": "python3 serve-local.py",
+    "start": "python3 serve-local.py",
+    "dev:public": "python3 serve-local.py --host 0.0.0.0"
+  }
+}

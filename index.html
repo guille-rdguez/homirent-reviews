@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Homi Reviews — Local</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0b1c33;
+  --navy2:#102541;
+  --green:#10493a;
+  --green-acc:#4ade80;
+  --white:#ffffff;
+  --text:#e8f0fe;
+  --text2:#9cb7d3;
+  --border:rgba(255,255,255,0.1);
+  --shadow:0 24px 80px rgba(0,0,0,0.32);
+  --font-head:'Syne',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  min-height:100vh;
+  font-family:var(--font-body);
+  color:var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(74,222,128,0.12), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(96,165,250,0.16), transparent 30%),
+    linear-gradient(135deg, #081426 0%, #0b1c33 48%, #102541 100%);
+  padding:32px 18px;
+}
+.wrap{max-width:980px;margin:0 auto}
+.hero{
+  padding:28px;
+  border:1px solid var(--border);
+  border-radius:28px;
+  background:rgba(16,37,65,0.78);
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(14px);
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin-bottom:26px;
+}
+.brand h1{
+  font-family:var(--font-head);
+  font-size:29px;
+  font-weight:800;
+  letter-spacing:0.04em;
+}
+.brand p{
+  color:var(--text2);
+  font-size:12px;
+  margin-top:3px;
+}
+.title{
+  font-family:var(--font-head);
+  font-size:clamp(34px, 7vw, 62px);
+  line-height:0.95;
+  margin-bottom:14px;
+}
+.sub{
+  max-width:620px;
+  color:var(--text2);
+  font-size:16px;
+  line-height:1.7;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:16px;
+  margin-top:26px;
+}
+.card{
+  padding:22px;
+  border-radius:22px;
+  background:rgba(11,28,51,0.72);
+  border:1px solid var(--border);
+}
+.eyebrow{
+  font-size:11px;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+  color:var(--text2);
+  margin-bottom:8px;
+}
+.card h2{
+  font-family:var(--font-head);
+  font-size:24px;
+  margin-bottom:8px;
+}
+.card p{
+  color:var(--text2);
+  line-height:1.7;
+  font-size:14px;
+}
+.actions{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-top:18px;
+}
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:180px;
+  padding:13px 18px;
+  border-radius:999px;
+  text-decoration:none;
+  font-weight:600;
+  transition:transform .16s ease, opacity .16s ease, border-color .16s ease;
+}
+.btn:hover{transform:translateY(-1px)}
+.btn-primary{
+  background:var(--green-acc);
+  color:#07151f;
+}
+.btn-secondary{
+  border:1px solid var(--border);
+  color:var(--text);
+  background:rgba(255,255,255,0.04);
+}
+.notes{
+  margin-top:18px;
+  color:var(--text2);
+  font-size:13px;
+  line-height:1.8;
+}
+@media (max-width: 760px){
+  .hero{padding:22px}
+  .grid{grid-template-columns:1fr}
+  .btn{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <div class="brand">
+      <svg width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+        <rect width="44" height="44" rx="11" fill="#10493a"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M10 13.5C10 11.57 11.57 10 13.5 10H18.5C20.43 10 22 11.57 22 13.5V18H22V13.5C22 11.57 23.57 10 25.5 10H30.5C32.43 10 34 11.57 34 13.5V30.5C34 32.43 32.43 34 30.5 34H25.5C23.57 34 22 32.43 22 30.5V27L22 27L22 30.5C22 32.43 20.43 34 18.5 34H13.5C11.57 34 10 32.43 10 30.5V13.5Z" fill="white"/>
+        <path d="M18 24L22 20L26 24" stroke="#10493a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <div>
+        <h1>HOMI</h1>
+        <p>Reviews Local Launcher</p>
+      </div>
+    </div>
+
+    <div class="title">Corre el proyecto en local sin build.</div>
+    <p class="sub">
+      Esta portada sirve como punto de entrada local para abrir el formulario de huéspedes
+      o el dashboard interno desde el mismo servidor estático.
+    </p>
+
+    <div class="grid">
+      <article class="card">
+        <div class="eyebrow">Publico</div>
+        <h2>Formulario</h2>
+        <p>Versión pensada para iPad, WhatsApp o QR. Guarda reviews directamente en Supabase.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="form.html">Abrir `form.html`</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="eyebrow">Interno</div>
+        <h2>Dashboard</h2>
+        <p>Panel para monitorear reviews, filtrar por periodo y revisar analytics por complejo.</p>
+        <div class="actions">
+          <a class="btn btn-secondary" href="dashboard.html">Abrir `dashboard.html`</a>
+        </div>
+      </article>
+    </div>
+
+    <div class="notes">
+      Inicia el servidor con <strong>`python3 serve-local.py`</strong> y luego entra a <strong>`http://127.0.0.1:4173/`</strong>.
+    </div>
+  </section>
+</div>
+</body>
+</html>
