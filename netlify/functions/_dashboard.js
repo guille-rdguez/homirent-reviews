@@ -181,10 +181,10 @@ function getSupabaseConfig() {
 
 async function fetchDashboardData() {
   const { url, key } = getSupabaseConfig();
-  const headers = {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
-  };
+  const headers = { apikey: key };
+  if (!String(key).startsWith('sb_')) {
+    headers.Authorization = `Bearer ${key}`;
+  }
 
   const propertiesUrl =
     `${url}/rest/v1/properties?select=id,city,name&active=eq.true&order=city,name`;

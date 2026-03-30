@@ -179,12 +179,12 @@ def supabase_config() -> tuple[str, str]:
 
 def supabase_json(path: str) -> list[dict]:
     url, key = supabase_config()
+    headers = {"apikey": key}
+    if not key.startswith("sb_"):
+        headers["Authorization"] = f"Bearer {key}"
     req = urlrequest.Request(
         f"{url}/rest/v1/{path}",
-        headers={
-            "apikey": key,
-            "Authorization": f"Bearer {key}",
-        },
+        headers=headers,
     )
     with urlrequest.urlopen(req, timeout=25) as response:
         return json.loads(response.read().decode("utf-8"))
