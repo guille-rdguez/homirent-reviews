@@ -30,6 +30,3 @@ Thumbs.db
 .codex/
 __pycache__/
 *.py[cod]
-
-# Local-only branding asset kept outside git
-assets/homi.jpg
