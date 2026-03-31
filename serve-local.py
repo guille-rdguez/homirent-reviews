@@ -10,11 +10,13 @@ import hmac
 import json
 import os
 import time
+import uuid
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
 from socketserver import TCPServer, ThreadingMixIn
 from urllib import error as urlerror
+from urllib import parse as urlparse
 from urllib import request as urlrequest
 
 
@@ -177,17 +179,80 @@ def supabase_config() -> tuple[str, str]:
     return url, key
 
 
-def supabase_json(path: str) -> list[dict]:
-    url, key = supabase_config()
+def supabase_headers(extra_headers: dict[str, str] | None = None) -> dict[str, str]:
+    _, key = supabase_config()
     headers = {"apikey": key}
     if not key.startswith("sb_"):
         headers["Authorization"] = f"Bearer {key}"
+    if extra_headers:
+        headers.update(extra_headers)
+    return headers
+
+
+def supabase_json(path: str) -> list[dict]:
+    url, _ = supabase_config()
     req = urlrequest.Request(
         f"{url}/rest/v1/{path}",
-        headers=headers,
+        headers=supabase_headers(),
     )
     with urlrequest.urlopen(req, timeout=25) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def normalize_whitespace(value: str) -> str:
+    return " ".join(str(value or "").strip().split())
+
+
+def create_property(name: str, city: str) -> dict:
+    normalized_name = normalize_whitespace(name)
+    normalized_city = normalize_whitespace(city)
+    if not normalized_name or not normalized_city:
+        raise RuntimeError("Nombre y ciudad son obligatorios")
+
+    url, _ = supabase_config()
+    payload = json.dumps(
+        {
+            "id": str(uuid.uuid4()),
+            "name": normalized_name,
+            "city": normalized_city,
+            "active": True,
+        }
+    ).encode("utf-8")
+    req = urlrequest.Request(
+        f"{url}/rest/v1/properties",
+        headers=supabase_headers(
+            {
+                "Content-Type": "application/json",
+                "Prefer": "return=representation",
+            }
+        ),
+        data=payload,
+        method="POST",
+    )
+    with urlrequest.urlopen(req, timeout=25) as response:
+        raw = response.read().decode("utf-8").strip()
+        created_rows = json.loads(raw) if raw else []
+        property_row = created_rows[0] if isinstance(created_rows, list) else created_rows
+        if not isinstance(property_row, dict) or not property_row.get("id"):
+            raise RuntimeError("Supabase no devolvio el complejo creado")
+        return property_row
+
+
+def delete_review(review_id: str) -> bool:
+    normalized_id = review_id.strip()
+    if not normalized_id:
+        raise RuntimeError("Review invalida")
+
+    url, _ = supabase_config()
+    req = urlrequest.Request(
+        f"{url}/rest/v1/reviews?id=eq.{urlparse.quote(normalized_id, safe='')}",
+        headers=supabase_headers({"Prefer": "return=representation"}),
+        method="DELETE",
+    )
+    with urlrequest.urlopen(req, timeout=25) as response:
+        raw = response.read().decode("utf-8").strip()
+        deleted_rows = json.loads(raw) if raw else []
+        return bool(deleted_rows)
 
 
 def fetch_dashboard_data() -> dict[str, list[dict]]:
@@ -232,6 +297,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             ("POST", "/api/dashboard-login"): self.handle_dashboard_login,
             ("GET", "/api/dashboard-session"): self.handle_dashboard_session,
             ("GET", "/api/dashboard-data"): self.handle_dashboard_data,
+            ("POST", "/api/dashboard-create-property"): self.handle_dashboard_create_property,
+            ("POST", "/api/dashboard-delete-review"): self.handle_dashboard_delete_review,
             ("POST", "/api/dashboard-logout"): self.handle_dashboard_logout,
         }
 
@@ -359,6 +426,116 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return
 
         self.send_json(HTTPStatus.OK, {"ok": True, **data})
+
+    def handle_dashboard_create_property(self) -> None:
+        payload = self.read_json_body()
+        if payload is None:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "Body JSON invalido"},
+            )
+            return
+
+        name = str(payload.get("name", ""))
+        city = str(payload.get("city", ""))
+        if not name.strip() or not city.strip():
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "Nombre y ciudad son obligatorios"},
+            )
+            return
+
+        try:
+            self.require_session()
+            property_row = create_property(name, city)
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except urlerror.HTTPError as exc:
+            details = exc.read().decode("utf-8", errors="replace").strip()
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {
+                    "ok": False,
+                    "error": details or f"Supabase devolvio {exc.code}",
+                },
+            )
+            return
+        except urlerror.URLError as exc:
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": f"No se pudo conectar a Supabase: {exc.reason}"},
+            )
+            return
+
+        self.send_json(HTTPStatus.OK, {"ok": True, "property": property_row})
+
+    def handle_dashboard_delete_review(self) -> None:
+        payload = self.read_json_body()
+        if payload is None:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "Body JSON invalido"},
+            )
+            return
+
+        review_id = str(payload.get("reviewId", "")).strip()
+        if not review_id:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "reviewId es obligatorio"},
+            )
+            return
+
+        try:
+            self.require_session()
+            deleted = delete_review(review_id)
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except urlerror.HTTPError as exc:
+            details = exc.read().decode("utf-8", errors="replace").strip()
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {
+                    "ok": False,
+                    "error": details or f"Supabase devolvio {exc.code}",
+                },
+            )
+            return
+        except urlerror.URLError as exc:
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": f"No se pudo conectar a Supabase: {exc.reason}"},
+            )
+            return
+
+        if not deleted:
+            self.send_json(
+                HTTPStatus.NOT_FOUND,
+                {"ok": False, "error": "La review ya no existe o no se pudo borrar"},
+            )
+            return
+
+        self.send_json(HTTPStatus.OK, {"ok": True, "deleted": True})
 
     def handle_dashboard_logout(self) -> None:
         self.send_json(HTTPStatus.OK, {"ok": True})

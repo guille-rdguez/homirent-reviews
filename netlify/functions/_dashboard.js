@@ -179,12 +179,25 @@ function getSupabaseConfig() {
   return { url, key };
 }
 
-async function fetchDashboardData() {
-  const { url, key } = getSupabaseConfig();
-  const headers = { apikey: key };
+function createSupabaseHeaders(extraHeaders = {}) {
+  const { key } = getSupabaseConfig();
+  const headers = {
+    apikey: key,
+    ...extraHeaders,
+  };
   if (!String(key).startsWith('sb_')) {
     headers.Authorization = `Bearer ${key}`;
   }
+  return headers;
+}
+
+function normalizeWhitespace(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+async function fetchDashboardData() {
+  const { url } = getSupabaseConfig();
+  const headers = createSupabaseHeaders();
 
   const propertiesUrl =
     `${url}/rest/v1/properties?select=id,city,name&active=eq.true&order=city,name`;
@@ -214,8 +227,85 @@ async function fetchDashboardData() {
   return { properties, reviews };
 }
 
+async function createProperty(input = {}) {
+  const name = normalizeWhitespace(input.name);
+  const city = normalizeWhitespace(input.city);
+  if (!name || !city) {
+    throw new Error('Nombre y ciudad son obligatorios');
+  }
+
+  const { url } = getSupabaseConfig();
+  const response = await fetch(`${url}/rest/v1/properties`, {
+    method: 'POST',
+    headers: createSupabaseHeaders({
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    }),
+    body: JSON.stringify({
+      id: crypto.randomUUID(),
+      name,
+      city,
+      active: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await readErrorText(response);
+    throw new Error(details || `Supabase devolvio ${response.status} al crear complejo`);
+  }
+
+  let createdRows = [];
+  try {
+    createdRows = await response.json();
+  } catch (error) {
+    createdRows = [];
+  }
+
+  const property = Array.isArray(createdRows) ? createdRows[0] : createdRows;
+  if (!property?.id) {
+    throw new Error('Supabase no devolvio el complejo creado');
+  }
+
+  return property;
+}
+
+async function deleteReviewById(reviewId) {
+  const normalizedId = String(reviewId || '').trim();
+  if (!normalizedId) {
+    throw new Error('Review invalida');
+  }
+
+  const { url } = getSupabaseConfig();
+  const deleteUrl =
+    `${url}/rest/v1/reviews?id=eq.${encodeURIComponent(normalizedId)}`;
+  const response = await fetch(deleteUrl, {
+    method: 'DELETE',
+    headers: createSupabaseHeaders({
+      Prefer: 'return=representation',
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await readErrorText(response);
+    throw new Error(details || `Supabase devolvio ${response.status} al borrar review`);
+  }
+
+  let deletedRows = [];
+  try {
+    deletedRows = await response.json();
+  } catch (error) {
+    deletedRows = [];
+  }
+
+  return {
+    deleted: deletedRows.length > 0,
+  };
+}
+
 module.exports = {
+  createProperty,
   createSession,
+  deleteReviewById,
   fetchDashboardData,
   json,
   methodNotAllowed,

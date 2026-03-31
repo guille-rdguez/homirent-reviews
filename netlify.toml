@@ -20,6 +20,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/dashboard-create-property"
+  to = "/.netlify/functions/dashboard-create-property"
+  status = 200
+
+[[redirects]]
+  from = "/api/dashboard-delete-review"
+  to = "/.netlify/functions/dashboard-delete-review"
+  status = 200
+
+[[redirects]]
   from = "/api/dashboard-logout"
   to = "/.netlify/functions/dashboard-logout"
   status = 200

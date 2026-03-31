@@ -92,6 +92,7 @@ body.auth-ready .auth-screen { display:none; }
   border:1px solid rgba(255,255,255,0.10);
   flex-shrink:0;
   display:block;
+  object-fit:cover;
 }
 .auth-word { font-family:var(--font-head); font-size:22px; font-weight:700; letter-spacing:0.04em; line-height:1; }
 .auth-subword { font-size:11px; color:var(--text3); margin-top:3px; }
@@ -184,6 +185,7 @@ body.auth-ready .auth-screen { display:none; }
   box-shadow:0 10px 24px rgba(0,0,0,0.22);
   flex-shrink:0;
   display:block;
+  object-fit:cover;
 }
 .logo-word { font-family:var(--font-head); font-size:18px; font-weight:700; color:var(--text); letter-spacing:0.04em; line-height:1; }
 .logo-sub  { font-size:10px; color:var(--text3); letter-spacing:0.4px; margin-top:2px; }
@@ -334,6 +336,9 @@ body.auth-ready .auth-screen { display:none; }
 .btn-ghost:hover { background:var(--navy3); color:var(--text); }
 .btn-primary { background:var(--green-acc); color:#000; font-weight:700; box-shadow:0 10px 22px rgba(74,222,128,0.22); }
 .btn-primary:hover { background:#6ee7a0; }
+.btn-danger { background:rgba(248,113,113,0.12); color:var(--red); border:1px solid rgba(248,113,113,0.26); }
+.btn-danger:hover { background:rgba(248,113,113,0.18); color:#ffe5e5; }
+.btn:disabled { opacity:0.6; cursor:not-allowed; }
 .btn-sm { padding:5px 11px; font-size:11px; }
 
 /* PAGES */
@@ -486,6 +491,47 @@ body.auth-ready .auth-screen { display:none; }
   line-height:1.7;
 }
 .link-tip strong { color:var(--text); }
+.property-form {
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:flex-end;
+}
+.property-field {
+  flex:1 1 220px;
+  min-width:0;
+}
+.property-label {
+  display:block;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color:var(--text3);
+  margin-bottom:7px;
+}
+.property-input {
+  width:100%;
+  border:none;
+  outline:none;
+  border-radius:14px;
+  padding:11px 13px;
+  font-size:13px;
+  color:var(--text);
+  background:var(--surface2);
+  border:1px solid var(--border);
+  font-family:var(--font-body);
+}
+.property-input:focus {
+  border-color:rgba(74,222,128,0.65);
+  box-shadow:0 0 0 4px rgba(74,222,128,0.14);
+}
+.property-help {
+  margin-top:12px;
+  font-size:12px;
+  color:var(--text2);
+  line-height:1.7;
+}
 
 /* FILTERS */
 .fbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -719,11 +765,7 @@ body.auth-ready .auth-screen { display:none; }
 <div class="auth-screen" id="auth-screen">
   <div class="auth-card">
     <div class="auth-brand">
-      <svg class="auth-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true">
-        <rect width="44" height="44" rx="11" fill="#10493a"/>
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M10 13.5C10 11.57 11.57 10 13.5 10H18.5C20.43 10 22 11.57 22 13.5V18H22V13.5C22 11.57 23.57 10 25.5 10H30.5C32.43 10 34 11.57 34 13.5V30.5C34 32.43 32.43 34 30.5 34H25.5C23.57 34 22 32.43 22 30.5V27L22 27L22 30.5C22 32.43 20.43 34 18.5 34H13.5C11.57 34 10 32.43 10 30.5V13.5Z" fill="white"/>
-        <path d="M18 24L22 20L26 24" stroke="#10493a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-      </svg>
+      <img class="auth-mark" src="assets/homi.jpg" alt="Logo Homi">
       <div>
         <div class="auth-word">HOMI</div>
         <div class="auth-subword">Centro de Reviews</div>
@@ -751,11 +793,7 @@ body.auth-ready .auth-screen { display:none; }
 
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <svg class="sidebar-mark" viewBox="0 0 44 44" fill="none" aria-hidden="true">
-      <rect width="44" height="44" rx="11" fill="#10493a"/>
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M10 13.5C10 11.57 11.57 10 13.5 10H18.5C20.43 10 22 11.57 22 13.5V18H22V13.5C22 11.57 23.57 10 25.5 10H30.5C32.43 10 34 11.57 34 13.5V30.5C34 32.43 32.43 34 30.5 34H25.5C23.57 34 22 32.43 22 30.5V27L22 27L22 30.5C22 32.43 20.43 34 18.5 34H13.5C11.57 34 10 32.43 10 30.5V13.5Z" fill="white"/>
-      <path d="M18 24L22 20L26 24" stroke="#10493a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    </svg>
+    <img class="sidebar-mark" src="assets/homi.jpg" alt="Logo Homi">
     <div>
       <div class="logo-word">HOMI</div>
       <div class="logo-sub">Centro de Reviews</div>
@@ -851,7 +889,7 @@ body.auth-ready .auth-screen { display:none; }
     <div class="phdr" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div><div class="phead">Todas las Reviews</div><div class="psub" id="rcountlbl">Cargando...</div></div>
       <div class="fbar">
-        <select class="fsel" id="fcity" onchange="applyTableFilters()"><option value="">Todas las ciudades</option><option>Querétaro</option><option>Ciudad de México</option><option>Mérida</option></select>
+        <select class="fsel" id="fcity" onchange="applyTableFilters()"><option value="">Todas las ciudades</option></select>
         <select class="fsel" id="fprop" onchange="applyTableFilters()"><option value="">Todos los complejos</option></select>
         <select class="fsel" id="frating" onchange="applyTableFilters()"><option value="">Todos los ratings</option><option value="5">⭐⭐⭐⭐⭐ 5</option><option value="4">⭐⭐⭐⭐ 4</option><option value="3">⭐⭐⭐ 3</option><option value="low">⭐⭐ 2 o menos</option></select>
         <button class="btn btn-ghost btn-sm" onclick="exportCsv()">Export CSV</button>
@@ -859,8 +897,8 @@ body.auth-ready .auth-screen { display:none; }
     </div>
     <div class="card" style="margin-top:14px;overflow-x:auto;padding:0">
       <table class="rtable">
-        <thead><tr><th>Huésped</th><th>Habitación</th><th>Complejo</th><th>Ciudad</th><th>Rating</th><th>Comentario</th><th>Regresa</th><th>Fuente</th><th>Fecha</th></tr></thead>
-        <tbody id="rtbody"><tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text3)">⏳ Cargando...</td></tr></tbody>
+        <thead><tr><th>Huésped</th><th>Habitación</th><th>Complejo</th><th>Ciudad</th><th>Rating</th><th>Comentario</th><th>Regresa</th><th>Fuente</th><th>Fecha</th><th>Acción</th></tr></thead>
+        <tbody id="rtbody"><tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text3)">⏳ Cargando...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -882,6 +920,26 @@ body.auth-ready .auth-screen { display:none; }
         <div id="lcityprints" class="fbar"></div>
         <button class="btn btn-ghost btn-sm" onclick="printAllQrs()">Imprimir todos los QR</button>
       </div>
+    </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="ch"><div class="ct">Alta rápida de complejo</div><div class="link-pill">Activo al crear</div></div>
+      <form class="property-form" id="property-form">
+        <div class="property-field">
+          <label class="property-label" for="property-name">Nombre del complejo</label>
+          <input class="property-input" id="property-name" type="text" maxlength="90" placeholder="Ej. Homi Centro Histórico" autocomplete="off">
+        </div>
+        <div class="property-field">
+          <label class="property-label" for="property-city">Ciudad</label>
+          <input class="property-input" id="property-city" type="text" maxlength="60" list="property-city-options" placeholder="Ej. Querétaro" autocomplete="off">
+          <datalist id="property-city-options">
+            <option value="Querétaro"></option>
+            <option value="Ciudad de México"></option>
+            <option value="Mérida"></option>
+          </datalist>
+        </div>
+        <button class="btn btn-primary" id="property-submit" type="submit">Crear complejo</button>
+      </form>
+      <div class="property-help">Al crearlo queda disponible de inmediato en el formulario público, en los links operativos y en los QR del dashboard.</div>
     </div>
     <div class="g2">
       <div class="card">
@@ -946,8 +1004,10 @@ const AUTH_STORAGE_KEY='homi_reviews_dashboard_auth_v1';
 const API_LOGIN='/api/dashboard-login';
 const API_SESSION='/api/dashboard-session';
 const API_DATA='/api/dashboard-data';
+const API_CREATE_PROPERTY='/api/dashboard-create-property';
+const API_DELETE_REVIEW='/api/dashboard-delete-review';
 const API_LOGOUT='/api/dashboard-logout';
-let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[];
+let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false;
 const AVC=['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#f87171'];
 
 function readAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||'null');}catch(e){return null;}}
@@ -997,7 +1057,9 @@ function resetDashboardState(){
   propMap={};
   activeQrPropertyId='';
   tableRows=[];
+  creatingProperty=false;
   if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}
+  if(document.getElementById('property-form'))resetPropertyForm();
   document.getElementById('nbadge').style.display='none';
   closeQrModal({target:{id:'qr-modal'}});
 }
@@ -1034,6 +1096,76 @@ function textOr(v,fallback='—'){return v===null||v===undefined||v===''?fallbac
 function safeText(v,fallback='—'){return escapeHtml(textOr(v,fallback));}
 function safeCity(v,fallback='—'){return escapeHtml(textOr(v,fallback).replace('Ciudad de México','CDMX'));}
 function safeJsArg(v){return escapeHtml(JSON.stringify(textOr(v,'')));}
+function normalizeSpaces(v){return String(v??'').trim().replace(/\s+/g,' ');}
+function normalizedKey(v){return normalizeSpaces(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+function titleCase(v){return normalizeSpaces(v).toLowerCase().split(' ').filter(Boolean).map(part=>part.charAt(0).toUpperCase()+part.slice(1)).join(' ');}
+function normalizeCityInput(v){
+  const key=normalizedKey(v);
+  if(!key)return '';
+  const knownCities={'cdmx':'Ciudad de México','ciudad de mexico':'Ciudad de México','mexico city':'Ciudad de México','queretaro':'Querétaro','merida':'Mérida'};
+  return knownCities[key]||titleCase(v);
+}
+function propertySort(a,b){return `${textOr(a.city,'')} ${textOr(a.name,'')}`.localeCompare(`${textOr(b.city,'')} ${textOr(b.name,'')}`,'es',{sensitivity:'base'});}
+function listFilterProperties(){
+  const map=new Map();
+  allProps.forEach(prop=>{if(prop?.id)map.set(prop.id,{id:prop.id,name:textOr(prop.name,''),city:textOr(prop.city,'')});});
+  allReviews.forEach(review=>{
+    if(!review?.property_id||map.has(review.property_id))return;
+    map.set(review.property_id,{id:review.property_id,name:textOr(review.properties?.name,'—'),city:textOr(review.properties?.city,'—')});
+  });
+  return [...map.values()].sort(propertySort);
+}
+function buildCityFilter(){
+  const sel=document.getElementById('fcity');
+  const current=sel.value;
+  const cities=[...new Set([
+    ...allProps.map(prop=>textOr(prop.city,'')),
+    ...allReviews.map(review=>textOr(review.properties?.city,''))
+  ].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
+  sel.innerHTML='<option value="">Todas las ciudades</option>';
+  cities.forEach(city=>{const o=document.createElement('option');o.value=city;o.textContent=city;sel.appendChild(o);});
+  if(cities.includes(current))sel.value=current;
+}
+function syncPropertyViews(){
+  propMap={};allProps.forEach(p=>{propMap[p.id]=p;});
+  buildCityFilter();
+  buildPropFilter();
+}
+function setPropertyCreateBusy(isBusy){
+  creatingProperty=isBusy;
+  const btn=document.getElementById('property-submit');
+  const nameInput=document.getElementById('property-name');
+  const cityInput=document.getElementById('property-city');
+  btn.disabled=isBusy;
+  btn.textContent=isBusy?'Creando...':'Crear complejo';
+  nameInput.disabled=isBusy;
+  cityInput.disabled=isBusy;
+}
+function resetPropertyForm(){document.getElementById('property-form').reset();setPropertyCreateBusy(false);}
+async function handlePropertyCreate(ev){
+  ev.preventDefault();
+  if(creatingProperty)return;
+  const name=normalizeSpaces(document.getElementById('property-name').value);
+  const city=normalizeCityInput(document.getElementById('property-city').value);
+  if(!name||!city){notify('⚠️','Escribe nombre y ciudad para crear el complejo');return;}
+  const duplicate=allProps.some(prop=>normalizedKey(prop.name)===normalizedKey(name)&&normalizedKey(prop.city)===normalizedKey(city));
+  if(duplicate){notify('⚠️','Ese complejo ya existe como activo');return;}
+  setPropertyCreateBusy(true);
+  try{
+    const data=await apiRequest(API_CREATE_PROPERTY,{method:'POST',body:{name,city}});
+    const property=data.property;
+    if(!property?.id)throw new Error('La API no devolvió el complejo creado');
+    allProps=[...allProps,property].sort(propertySort);
+    syncPropertyViews();
+    renderAll();
+    resetPropertyForm();
+    notify('🏨',`Complejo creado: ${property.name}`);
+  }catch(e){
+    console.error(e);
+    notify('❌',`No se pudo crear el complejo: ${e.message}`);
+    setPropertyCreateBusy(false);
+  }
+}
 function formUrl(opts={}){
   const {source='form',propertyId=''}=opts;
   const url=new URL(FORM_URL,window.location.href);
@@ -1189,6 +1321,30 @@ function exportCsv(){
   downloadFile(`homi-reviews-${currentDateLabel()}.csv`,`\uFEFF${lines.join('\n')}`,'text/csv;charset=utf-8;');
   notify('⬇️',`CSV exportado (${tableRows.length} reviews)`);
 }
+async function deleteReview(reviewId,guestName='Anónimo'){
+  const normalizedId=textOr(reviewId,'').trim();
+  if(!normalizedId||deletingReviewIds.has(normalizedId))return;
+  const label=textOr(guestName,'Anónimo');
+  const confirmed=window.confirm(`¿Borrar la review de ${label}? Esta acción elimina el registro y actualizará las métricas del dashboard.`);
+  if(!confirmed)return;
+  deletingReviewIds.add(normalizedId);
+  renderTable(tableRows);
+  let deleted=false;
+  try{
+    await apiRequest(API_DELETE_REVIEW,{method:'POST',body:{reviewId:normalizedId}});
+    allReviews=allReviews.filter(r=>r.id!==normalizedId);
+    filtered=filtered.filter(r=>r.id!==normalizedId);
+    deleted=true;
+    renderAll();
+    notify('🗑️',`Review eliminada: ${label}`);
+  }catch(e){
+    console.error(e);
+    notify('❌',`No se pudo borrar la review: ${e.message}`);
+  }finally{
+    deletingReviewIds.delete(normalizedId);
+    if(!deleted)renderTable(tableRows);
+  }
+}
 function renderLinks(){
   const genericEl=document.getElementById('lgeneric');
   const gridEl=document.getElementById('lgrid');
@@ -1228,8 +1384,9 @@ async function loadAll(){
   try{
     const data=await apiRequest(API_DATA);
     allProps=data.properties||[];
-    propMap={};allProps.forEach(p=>{propMap[p.id]=p;});buildPropFilter();renderLinks();
     allReviews=data.reviews||[];
+    allProps.sort(propertySort);
+    syncPropertyViews();
     dateFrom=new Date();dateFrom.setDate(dateFrom.getDate()-7);dateFrom.setHours(0,0,0,0);dateTo=new Date();
     applyDate();
     const today=new Date();today.setHours(0,0,0,0);
@@ -1250,7 +1407,14 @@ async function loadAll(){
   }
 }
 function refresh(){if(!authReady)return;loadAll();notify('↻','Actualizando...');}
-function buildPropFilter(){const sel=document.getElementById('fprop');sel.innerHTML='<option value="">Todos los complejos</option>';allProps.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} (${p.city.replace('Ciudad de México','CDMX')})`;sel.appendChild(o);});}
+function buildPropFilter(){
+  const sel=document.getElementById('fprop');
+  const current=sel.value;
+  const properties=listFilterProperties();
+  sel.innerHTML='<option value="">Todos los complejos</option>';
+  properties.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`${p.name} (${textOr(p.city,'').replace('Ciudad de México','CDMX')})`;sel.appendChild(o);});
+  if(properties.some(p=>p.id===current))sel.value=current;
+}
 function renderAll(){renderDash();applyTableFilters();renderAnalytics();renderLinks();}
 
 function rc(n){return n<=2?'var(--red)':n===3?'var(--amber)':'var(--green-acc)';}
@@ -1321,10 +1485,11 @@ function applyTableFilters(){
 
 function renderTable(reviews){
   const tb=document.getElementById('rtbody');
-  if(!reviews.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:28px;color:var(--text3)">Sin reviews para estos filtros</td></tr>';return;}
+  if(!reviews.length){tb.innerHTML='<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--text3)">Sin reviews para estos filtros</td></tr>';return;}
   tb.innerHTML=reviews.map(r=>{
     const prop=safeText(r.properties?.name),city=safeCity(r.properties?.city),rCol=rc(r.rating),ret=r.would_return===true?'<span class="tag tg">👍 Sí</span>':r.would_return===false?'<span class="tag ta">🤔 No</span>':'—';
-    return `<tr><td style="font-weight:600;color:var(--text)">${safeText(r.guest_name,'Anónimo')}</td><td>${safeText(r.room_name)}</td><td style="font-weight:500">${prop}</td><td style="font-size:11px;color:var(--text3)">${city}</td><td><span style="font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;color:${rCol}">${r.rating}★</span>${r.rating<=2?' <span class="abadge">!</span>':''}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeText(r.comment)}</td><td>${ret}</td><td><span class="stag">${safeText(r.source,'form')}</span></td><td style="white-space:nowrap;font-size:11px;color:var(--text3)">${fmtDate(r.created_at)}</td></tr>`;
+    const isDeleting=deletingReviewIds.has(r.id);
+    return `<tr><td style="font-weight:600;color:var(--text)">${safeText(r.guest_name,'Anónimo')}</td><td>${safeText(r.room_name)}</td><td style="font-weight:500">${prop}</td><td style="font-size:11px;color:var(--text3)">${city}</td><td><span style="font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;color:${rCol}">${r.rating}★</span>${r.rating<=2?' <span class="abadge">!</span>':''}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeText(r.comment)}</td><td>${ret}</td><td><span class="stag">${safeText(r.source,'form')}</span></td><td style="white-space:nowrap;font-size:11px;color:var(--text3)">${fmtDate(r.created_at)}</td><td><button class="btn btn-danger btn-sm" onclick="deleteReview(${safeJsArg(r.id)},${safeJsArg(r.guest_name||'Anónimo')})" ${isDeleting?'disabled':''}>${isDeleting?'Borrando...':'Borrar'}</button></td></tr>`;
   }).join('');
 }
 
@@ -1357,6 +1522,7 @@ async function logout(){
 }
 
 window.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeQrModal({target:{id:'qr-modal'}});});
+document.getElementById('property-form').addEventListener('submit',handlePropertyCreate);
 initAuth();
 </script>
 </body>
