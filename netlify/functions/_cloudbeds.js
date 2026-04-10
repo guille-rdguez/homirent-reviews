@@ -571,9 +571,11 @@ function buildReservationQuery(payload, propertyID, defaultWindowDays) {
     query.modifiedFrom;
 
   if (!hasWindow) {
-    query.checkedOutFrom = subtractDays(defaultWindowDays);
-    query.checkedOutTo = new Date().toISOString().slice(0, 10);
-    if (!query.status) query.status = 'checked_out';
+    // Use checkOut window with confirmed status because the operations team
+    // never changes status to checked_out — reservations stay as confirmed.
+    query.checkOutFrom = subtractDays(defaultWindowDays);
+    query.checkOutTo = new Date().toISOString().slice(0, 10);
+    if (!query.status) query.status = 'confirmed';
   }
 
   return query;
