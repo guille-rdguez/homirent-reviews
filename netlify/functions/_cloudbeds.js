@@ -676,10 +676,11 @@ async function syncCloudbedsReservations(payload = {}) {
       continue;
     }
 
-    const reservationPayload = await cloudbedsGet(
-      'getReservations',
-      buildReservationQuery(payload, target.propertyID, cloudbedsConfig.defaultSyncWindowDays)
-    );
+    const reservationQuery = buildReservationQuery(payload, target.propertyID, cloudbedsConfig.defaultSyncWindowDays);
+    const reservationPayload = await cloudbedsGet('getReservations', reservationQuery);
+    if (payload.debug && summary.propertiesScanned === 1) {
+      return { debug: true, query: reservationQuery, rawResponse: reservationPayload, target };
+    }
     const reservations = parseCloudbedsData(reservationPayload);
     summary.reservationsFetched += reservations.length;
 
