@@ -576,9 +576,6 @@ function buildReservationQuery(payload, propertyID, defaultWindowDays) {
     if (!query.status) query.status = 'checked_out';
   }
 
-  if (!query.resultsFrom) query.resultsFrom = '1';
-  if (!query.resultsTo) query.resultsTo = '500';
-
   return query;
 }
 
