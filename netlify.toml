@@ -34,6 +34,21 @@
   to = "/.netlify/functions/dashboard-logout"
   status = 200
 
+[[redirects]]
+  from = "/api/internal/cloudbeds-sync"
+  to = "/.netlify/functions/cloudbeds-sync"
+  status = 200
+
+[[redirects]]
+  from = "/api/inbound/email"
+  to = "/.netlify/functions/inbound-email"
+  status = 200
+
+[[redirects]]
+  from = "/api/internal/process-inbound-message"
+  to = "/.netlify/functions/process-inbound-message"
+  status = 200
+
 [[headers]]
   for = "/*.html"
   [headers.values]

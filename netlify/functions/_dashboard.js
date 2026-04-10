@@ -275,6 +275,11 @@ async function deleteReviewById(reviewId) {
     throw new Error('Review invalida');
   }
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(normalizedId)) {
+    throw new Error('Review invalida');
+  }
+
   const { url } = getSupabaseConfig();
   const deleteUrl =
     `${url}/rest/v1/reviews?id=eq.${encodeURIComponent(normalizedId)}`;
@@ -305,11 +310,14 @@ async function deleteReviewById(reviewId) {
 module.exports = {
   createProperty,
   createSession,
+  createSupabaseHeaders,
   deleteReviewById,
   fetchDashboardData,
+  getSupabaseConfig,
   json,
   methodNotAllowed,
   parseJsonBody,
+  readErrorText,
   requireSession,
   serverError,
   unauthorized,
