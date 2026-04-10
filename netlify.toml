@@ -4,6 +4,9 @@
 [functions]
   directory = "netlify/functions"
 
+[functions."cloudbeds-sync-cron"]
+  schedule = "0 12 * * *"
+
 [[redirects]]
   from = "/api/dashboard-login"
   to = "/.netlify/functions/dashboard-login"
