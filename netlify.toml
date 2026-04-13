@@ -38,6 +38,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/dashboard-reservations"
+  to = "/.netlify/functions/dashboard-reservations"
+  status = 200
+
+[[redirects]]
   from = "/api/internal/cloudbeds-sync"
   to = "/.netlify/functions/cloudbeds-sync"
   status = 200

@@ -240,11 +240,11 @@ body.auth-ready .auth-screen { display:none; }
   margin-left:auto;
   font-size:10px;
   font-weight:700;
-  background:var(--green-acc);
-  color:#000;
+  background:var(--green);
+  color:#fff;
   padding:2px 7px;
   border-radius:999px;
-  box-shadow:0 8px 18px rgba(74,222,128,0.22);
+  border:1px solid rgba(255,255,255,0.18);
 }
 .sidebar-footer { padding:14px; border-top:1px solid var(--border); }
 .ws-pill { display:flex; align-items:center; gap:9px; padding:9px 11px; background:var(--navy3); border-radius:10px; }
@@ -277,7 +277,12 @@ body.auth-ready .auth-screen { display:none; }
   font-family:var(--font-body); white-space:nowrap;
 }
 .dpill:hover { background:var(--navy3); color:var(--text); border-color:var(--border2); }
-.dpill.active { background:var(--green-acc); color:#000; border-color:var(--green-acc); }
+.dpill.active {
+  background:var(--green);
+  color:#fff;
+  border-color:rgba(255,255,255,0.32);
+  box-shadow:0 0 22px rgba(255,255,255,0.20);
+}
 
 /* CUSTOM RANGE */
 .crange { display:none; align-items:center; gap:6px; }
@@ -292,11 +297,12 @@ body.auth-ready .auth-screen { display:none; }
 .dinput::-webkit-calendar-picker-indicator { filter:invert(0.6); cursor:pointer; }
 .dsep { font-size:11px; color:var(--text3); }
 .dapply {
-  padding:5px 12px; background:var(--green-acc); color:#000;
+  padding:5px 12px; background:var(--green); color:#fff;
   border:none; border-radius:8px;
   font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body);
+  box-shadow:0 0 18px rgba(255,255,255,0.16);
 }
-.dapply:hover { background:#6ee7a0; }
+.dapply:hover { background:#0f5645; box-shadow:0 0 22px rgba(255,255,255,0.22); }
 
 .pchip {
   font-size:11px;
@@ -334,8 +340,14 @@ body.auth-ready .auth-screen { display:none; }
 .btn { display:inline-flex; align-items:center; gap:5px; padding:8px 14px; border-radius:10px; font-family:var(--font-body); font-size:12px; font-weight:500; cursor:pointer; border:none; transition:all 0.15s; }
 .btn-ghost { background:transparent; color:var(--text2); border:1px solid var(--border2); }
 .btn-ghost:hover { background:var(--navy3); color:var(--text); }
-.btn-primary { background:var(--green-acc); color:#000; font-weight:700; box-shadow:0 10px 22px rgba(74,222,128,0.22); }
-.btn-primary:hover { background:#6ee7a0; }
+.btn-primary {
+  background:var(--green);
+  color:#fff;
+  font-weight:700;
+  border:1px solid rgba(255,255,255,0.18);
+  box-shadow:0 10px 22px rgba(255,255,255,0.18);
+}
+.btn-primary:hover { background:#0f5645; box-shadow:0 12px 28px rgba(255,255,255,0.24); }
 .btn-danger { background:rgba(248,113,113,0.12); color:var(--red); border:1px solid rgba(248,113,113,0.26); }
 .btn-danger:hover { background:rgba(248,113,113,0.18); color:#ffe5e5; }
 .btn:disabled { opacity:0.6; cursor:not-allowed; }
@@ -810,6 +822,10 @@ body.auth-ready .auth-screen { display:none; }
       Todas las Reviews
       <span id="nbadge" class="nav-badge" style="display:none"></span>
     </div>
+    <div class="nav-item" onclick="nav('reservaciones')">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
+      Reservaciones
+    </div>
     <div class="nav-label">Analytics</div>
     <div class="nav-item" onclick="nav('analytics')">
       <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-4a1 1 0 011-1h2a1 1 0 011 1v13a1 1 0 01-1 1h-2a1 1 0 01-1-1V3z"/></svg>
@@ -899,6 +915,23 @@ body.auth-ready .auth-screen { display:none; }
       <table class="rtable">
         <thead><tr><th>Huésped</th><th>Habitación</th><th>Complejo</th><th>Ciudad</th><th>Rating</th><th>Comentario</th><th>Regresa</th><th>Fuente</th><th>Fecha</th><th>Acción</th></tr></thead>
         <tbody id="rtbody"><tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text3)">⏳ Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RESERVACIONES -->
+  <div class="page" id="page-reservaciones">
+    <div class="phdr" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="phead">Reservaciones Cloudbeds</div><div class="psub" id="rescountlbl">Cargando...</div></div>
+      <div class="fbar">
+        <select class="fsel" id="freschannel" onchange="applyResFilters()"><option value="">Todos los canales</option><option value="direct">Directo</option><option value="booking">Booking.com</option><option value="expedia">Expedia</option><option value="airbnb">Airbnb</option></select>
+        <select class="fsel" id="fresprop" onchange="applyResFilters()"><option value="">Todos los complejos</option></select>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px;overflow-x:auto;padding:0">
+      <table class="rtable">
+        <thead><tr><th>Huésped</th><th>Habitación</th><th>Complejo</th><th>Ciudad</th><th>Canal</th><th>Check-in</th><th>Check-out</th><th>Estado</th></tr></thead>
+        <tbody id="restbody"><tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text3)">⏳ Cargando...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1007,7 +1040,8 @@ const API_DATA='/api/dashboard-data';
 const API_CREATE_PROPERTY='/api/dashboard-create-property';
 const API_DELETE_REVIEW='/api/dashboard-delete-review';
 const API_LOGOUT='/api/dashboard-logout';
-let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false;
+const API_RESERVATIONS='/api/dashboard-reservations';
+let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false,allReservations=[],resFiltered=[],reservationsLoaded=false;
 const AVC=['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#f87171'];
 
 function readAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||'null');}catch(e){return null;}}
@@ -1058,6 +1092,9 @@ function resetDashboardState(){
   activeQrPropertyId='';
   tableRows=[];
   creatingProperty=false;
+  allReservations=[];
+  resFiltered=[];
+  reservationsLoaded=false;
   if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}
   if(document.getElementById('property-form'))resetPropertyForm();
   document.getElementById('nbadge').style.display='none';
@@ -1506,8 +1543,80 @@ function renderAnalytics(){
   }).join('');
 }
 
-const TITLES={dashboard:'Dashboard',reviews:'Todas las Reviews',analytics:'Analytics por Complejo',links:'Links por Complejo'};
-function nav(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('page-'+page).classList.add('active');document.getElementById('ttitle').textContent=TITLES[page]||page;const el=[...document.querySelectorAll('.nav-item')].find(n=>n.getAttribute('onclick')?.includes("'"+page+"'"));if(el)el.classList.add('active');window.scrollTo(0,0);}
+const TITLES={dashboard:'Dashboard',reviews:'Todas las Reviews',reservaciones:'Reservaciones Cloudbeds',analytics:'Analytics por Complejo',links:'Links por Complejo'};
+
+const CHANNEL_LABELS={booking:'Booking.com',expedia:'Expedia',airbnb:'Airbnb',direct:'Directo',vrbo:'VRBO',unknown:'Otro'};
+const STATUS_LABELS={confirmed:'Confirmada',checked_out:'Check-out',checked_in:'En casa',cancelled:'Cancelada',pending:'Pendiente'};
+const STATUS_COLORS={confirmed:'var(--blue-acc)',checked_out:'var(--green-acc)',checked_in:'var(--amber)',cancelled:'var(--red)',pending:'var(--text3)'};
+
+function fmtDate(v){if(!v)return '—';const d=new Date(v+'T12:00:00');return d.toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'});}
+
+async function loadReservations(){
+  if(!authReady)return;
+  document.getElementById('rescountlbl').textContent='Cargando...';
+  document.getElementById('restbody').innerHTML='<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text3)">⏳ Cargando...</td></tr>';
+  try{
+    const data=await apiRequest(API_RESERVATIONS,{method:'GET'});
+    allReservations=data.reservations||[];
+    reservationsLoaded=true;
+    buildResPropFilter();
+    applyResFilters();
+  }catch(e){
+    console.error(e);
+    document.getElementById('restbody').innerHTML=`<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--red)">Error: ${escapeHtml(e.message)}</td></tr>`;
+    document.getElementById('rescountlbl').textContent='Error al cargar';
+  }
+}
+
+function buildResPropFilter(){
+  const sel=document.getElementById('fresprop');
+  const current=sel.value;
+  const seen=new Map();
+  allReservations.forEach(r=>{
+    if(r.property_id&&r.properties?.name)seen.set(r.property_id,r.properties.name);
+  });
+  const sorted=[...seen.entries()].sort((a,b)=>a[1].localeCompare(b[1],'es',{sensitivity:'base'}));
+  sel.innerHTML='<option value="">Todos los complejos</option>';
+  sorted.forEach(([id,name])=>{const o=document.createElement('option');o.value=id;o.textContent=name;sel.appendChild(o);});
+  if([...seen.keys()].includes(current))sel.value=current;
+}
+
+function applyResFilters(){
+  const ch=document.getElementById('freschannel').value;
+  const pr=document.getElementById('fresprop').value;
+  resFiltered=allReservations.filter(r=>{
+    if(ch&&r.channel!==ch)return false;
+    if(pr&&r.property_id!==pr)return false;
+    return true;
+  });
+  renderReservations();
+}
+
+function renderReservations(){
+  const tbody=document.getElementById('restbody');
+  const lbl=document.getElementById('rescountlbl');
+  lbl.textContent=`${resFiltered.length.toLocaleString('es-MX')} reservaciones`;
+  if(!resFiltered.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text3)">Sin resultados</td></tr>';return;}
+  tbody.innerHTML=resFiltered.map(r=>{
+    const channel=r.channel||'unknown';
+    const status=r.status||'unknown';
+    const chLabel=CHANNEL_LABELS[channel]||channel;
+    const stLabel=STATUS_LABELS[status]||status;
+    const stColor=STATUS_COLORS[status]||'var(--text3)';
+    return `<tr>
+      <td>${safeText(r.guest_name)}</td>
+      <td>${safeText(r.room_name)}</td>
+      <td>${safeText(r.properties?.name)}</td>
+      <td>${safeCity(r.properties?.city)}</td>
+      <td><span style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,0.07);color:var(--text2)">${escapeHtml(chLabel)}</span></td>
+      <td>${fmtDate(r.check_in)}</td>
+      <td>${fmtDate(r.check_out)}</td>
+      <td><span style="font-size:11px;color:${stColor}">${escapeHtml(stLabel)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function nav(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('page-'+page).classList.add('active');document.getElementById('ttitle').textContent=TITLES[page]||page;const el=[...document.querySelectorAll('.nav-item')].find(n=>n.getAttribute('onclick')?.includes("'"+page+"'"));if(el)el.classList.add('active');window.scrollTo(0,0);if(page==='reservaciones'&&!reservationsLoaded)loadReservations();}
 
 function timeAgo(ds){const diff=Date.now()-new Date(ds).getTime();const m=Math.floor(diff/60000),h=Math.floor(m/60),d=Math.floor(h/24);if(m<1)return 'ahora';if(m<60)return `hace ${m}m`;if(h<24)return `hace ${h}h`;return `hace ${d}d`;}
 function fmtDate(ds){return new Date(ds).toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
