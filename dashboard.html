@@ -826,6 +826,11 @@ body.auth-ready .auth-screen { display:none; }
       <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
       Reservaciones
     </div>
+    <div class="nav-item" onclick="nav('google')">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+      Google Reviews
+      <span id="gbadge" class="nav-badge" style="display:none"></span>
+    </div>
     <div class="nav-label">Analytics</div>
     <div class="nav-item" onclick="nav('analytics')">
       <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-4a1 1 0 011-1h2a1 1 0 011 1v13a1 1 0 01-1 1h-2a1 1 0 01-1-1V3z"/></svg>
@@ -917,6 +922,18 @@ body.auth-ready .auth-screen { display:none; }
         <tbody id="rtbody"><tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text3)">⏳ Cargando...</td></tr></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- GOOGLE REVIEWS -->
+  <div class="page" id="page-google">
+    <div class="phdr" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="phead">Google Reviews</div><div class="psub" id="gcountlbl">Cargando...</div></div>
+      <div class="fbar">
+        <select class="fsel" id="fgprop" onchange="applyGoogleFilters()"><option value="">Todos los complejos</option></select>
+        <select class="fsel" id="fgresponded" onchange="applyGoogleFilters()"><option value="">Todas</option><option value="false">Pendientes</option><option value="true">Respondidas</option></select>
+      </div>
+    </div>
+    <div id="gcards" style="margin-top:14px;display:flex;flex-direction:column;gap:12px"></div>
   </div>
 
   <!-- RESERVACIONES -->
@@ -1041,7 +1058,8 @@ const API_CREATE_PROPERTY='/api/dashboard-create-property';
 const API_DELETE_REVIEW='/api/dashboard-delete-review';
 const API_LOGOUT='/api/dashboard-logout';
 const API_RESERVATIONS='/api/dashboard-reservations';
-let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false,allReservations=[],resFiltered=[],reservationsLoaded=false;
+const API_GOOGLE_REVIEWS='/api/dashboard-google-reviews';
+let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false,allReservations=[],resFiltered=[],reservationsLoaded=false,allGoogleReviews=[],googleFiltered=[],googleLoaded=false;
 const AVC=['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#f87171'];
 
 function readAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||'null');}catch(e){return null;}}
@@ -1095,6 +1113,9 @@ function resetDashboardState(){
   allReservations=[];
   resFiltered=[];
   reservationsLoaded=false;
+  allGoogleReviews=[];
+  googleFiltered=[];
+  googleLoaded=false;
   if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}
   if(document.getElementById('property-form'))resetPropertyForm();
   document.getElementById('nbadge').style.display='none';
@@ -1543,7 +1564,104 @@ function renderAnalytics(){
   }).join('');
 }
 
-const TITLES={dashboard:'Dashboard',reviews:'Todas las Reviews',reservaciones:'Reservaciones Cloudbeds',analytics:'Analytics por Complejo',links:'Links por Complejo'};
+const TITLES={dashboard:'Dashboard',reviews:'Todas las Reviews',reservaciones:'Reservaciones Cloudbeds',google:'Google Reviews',analytics:'Analytics por Complejo',links:'Links por Complejo'};
+
+async function loadGoogleReviews(){
+  if(!authReady)return;
+  document.getElementById('gcountlbl').textContent='Cargando...';
+  document.getElementById('gcards').innerHTML='<div style="padding:32px;text-align:center;color:var(--text3)">⏳ Cargando...</div>';
+  try{
+    const data=await apiRequest(API_GOOGLE_REVIEWS,{method:'GET'});
+    allGoogleReviews=data.reviews||[];
+    googleLoaded=true;
+    buildGooglePropFilter();
+    applyGoogleFilters();
+    const pending=allGoogleReviews.filter(r=>!r.responded).length;
+    const b=document.getElementById('gbadge');
+    if(pending>0){b.textContent=pending;b.style.display='inline';}else{b.style.display='none';}
+  }catch(e){
+    console.error(e);
+    document.getElementById('gcards').innerHTML=`<div style="padding:32px;text-align:center;color:var(--red)">Error: ${escapeHtml(e.message)}</div>`;
+    document.getElementById('gcountlbl').textContent='Error al cargar';
+  }
+}
+
+function buildGooglePropFilter(){
+  const sel=document.getElementById('fgprop');
+  const current=sel.value;
+  const seen=new Map();
+  allGoogleReviews.forEach(r=>{if(r.property_id&&r.properties?.name)seen.set(r.property_id,r.properties.name);});
+  const sorted=[...seen.entries()].sort((a,b)=>a[1].localeCompare(b[1],'es',{sensitivity:'base'}));
+  sel.innerHTML='<option value="">Todos los complejos</option>';
+  sorted.forEach(([id,name])=>{const o=document.createElement('option');o.value=id;o.textContent=name;sel.appendChild(o);});
+  if([...seen.keys()].includes(current))sel.value=current;
+}
+
+function applyGoogleFilters(){
+  const prop=document.getElementById('fgprop').value;
+  const resp=document.getElementById('fgresponded').value;
+  googleFiltered=allGoogleReviews.filter(r=>{
+    if(prop&&r.property_id!==prop)return false;
+    if(resp==='true'&&!r.responded)return false;
+    if(resp==='false'&&r.responded)return false;
+    return true;
+  });
+  renderGoogleReviews();
+}
+
+function starsHtml(rating){
+  if(!rating)return '<span style="color:var(--text3)">Sin rating</span>';
+  const full=Math.round(rating);
+  return '<span style="color:#fbbf24">'+('★'.repeat(full)+'☆'.repeat(5-full))+'</span> <span style="font-size:12px;color:var(--text2)">'+rating+'</span>';
+}
+
+function fmtDateTime(v){if(!v)return '—';const d=new Date(v);return d.toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'});}
+
+async function toggleGoogleResponded(id,currentResponded){
+  const newVal=!currentResponded;
+  try{
+    await apiRequest(API_GOOGLE_REVIEWS,{method:'POST',body:{id,responded:newVal}});
+    const idx=allGoogleReviews.findIndex(r=>r.id===id);
+    if(idx>=0){allGoogleReviews[idx].responded=newVal;allGoogleReviews[idx].responded_at=newVal?new Date().toISOString():null;}
+    const pending=allGoogleReviews.filter(r=>!r.responded).length;
+    const b=document.getElementById('gbadge');
+    if(pending>0){b.textContent=pending;b.style.display='inline';}else{b.style.display='none';}
+    applyGoogleFilters();
+    notify(newVal?'✅':'↩️',newVal?'Marcada como respondida':'Marcada como pendiente');
+  }catch(e){
+    notify('❌','Error: '+e.message);
+  }
+}
+
+function renderGoogleReviews(){
+  const el=document.getElementById('gcards');
+  const lbl=document.getElementById('gcountlbl');
+  const pending=googleFiltered.filter(r=>!r.responded).length;
+  lbl.textContent=`${googleFiltered.length} reviews · ${pending} pendientes de respuesta`;
+  if(!googleFiltered.length){el.innerHTML='<div class="card" style="padding:32px;text-align:center;color:var(--text3)">Sin resultados</div>';return;}
+  el.innerHTML=googleFiltered.map(r=>{
+    const responded=r.responded;
+    const reviewUrl=r.review_url||'';
+    return `<div class="card" style="padding:16px 20px;opacity:${responded?'0.6':'1'}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+            <span style="font-weight:600;color:var(--text)">${safeText(r.guest_name,'Anónimo')}</span>
+            <span style="color:var(--text3);font-size:12px">${safeText(r.properties?.name)}</span>
+            <span style="color:var(--text3);font-size:12px">${fmtDateTime(r.published_at)}</span>
+            ${responded?'<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(74,222,128,0.1);color:var(--green-acc)">Respondida</span>':'<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(251,191,36,0.1);color:var(--amber)">Pendiente</span>'}
+          </div>
+          <div style="margin-bottom:6px">${starsHtml(r.rating)}</div>
+          <div style="color:var(--text2);font-size:13px;line-height:1.5">${safeText(r.comment,'Sin comentario')}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
+          ${reviewUrl?`<a href="${escapeHtml(reviewUrl)}" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="text-decoration:none;text-align:center">Responder en Google ↗</a>`:''}
+          <button class="btn btn-ghost btn-sm" onclick="toggleGoogleResponded(${safeJsArg(r.id)},${responded})">${responded?'Marcar pendiente':'Marcar respondida'}</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
 
 const CHANNEL_LABELS={booking:'Booking.com',expedia:'Expedia',airbnb:'Airbnb',direct:'Directo',vrbo:'VRBO',unknown:'Otro'};
 const STATUS_LABELS={confirmed:'Confirmada',checked_out:'Check-out',checked_in:'En casa',cancelled:'Cancelada',pending:'Pendiente'};
@@ -1616,7 +1734,7 @@ function renderReservations(){
   }).join('');
 }
 
-function nav(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('page-'+page).classList.add('active');document.getElementById('ttitle').textContent=TITLES[page]||page;const el=[...document.querySelectorAll('.nav-item')].find(n=>n.getAttribute('onclick')?.includes("'"+page+"'"));if(el)el.classList.add('active');window.scrollTo(0,0);if(page==='reservaciones'&&!reservationsLoaded)loadReservations();}
+function nav(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('page-'+page).classList.add('active');document.getElementById('ttitle').textContent=TITLES[page]||page;const el=[...document.querySelectorAll('.nav-item')].find(n=>n.getAttribute('onclick')?.includes("'"+page+"'"));if(el)el.classList.add('active');window.scrollTo(0,0);if(page==='reservaciones'&&!reservationsLoaded)loadReservations();if(page==='google'&&!googleLoaded)loadGoogleReviews();}
 
 function timeAgo(ds){const diff=Date.now()-new Date(ds).getTime();const m=Math.floor(diff/60000),h=Math.floor(m/60),d=Math.floor(h/24);if(m<1)return 'ahora';if(m<60)return `hace ${m}m`;if(h<24)return `hace ${h}h`;return `hace ${d}d`;}
 function fmtDate(ds){return new Date(ds).toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
