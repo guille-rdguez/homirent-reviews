@@ -366,9 +366,19 @@ function extractRoomName(record) {
 
   const rooms = ensureArray(record.rooms);
   const firstRoom = rooms[0] || null;
-  return normalizeText(
+  const fromRooms = normalizeText(
     pick(firstRoom || {}, ['roomName', 'roomTypeName', 'roomType', 'name'])
   );
+  if (fromRooms) return fromRooms;
+
+  // Cloudbeds nests room info inside guestList.[guestID].rooms
+  const guestList = record.guestList || {};
+  const firstGuest = Object.values(guestList)[0] || {};
+  const guestRooms = ensureArray(firstGuest.rooms);
+  const firstGuestRoom = guestRooms[0] || {};
+  return normalizeText(
+    pick(firstGuestRoom, ['roomTypeNameShort', 'roomName', 'roomTypeName', 'roomType'])
+  ) || normalizeText(pick(firstGuest, ['roomName']));
 }
 
 function normalizeChannel(sourceName, sourceId) {
