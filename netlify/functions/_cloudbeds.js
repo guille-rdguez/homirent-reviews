@@ -731,6 +731,7 @@ async function syncCloudbedsReservations(payload = {}) {
 }
 
 module.exports = {
+  cloudbedsGet,
   json,
   requireSyncAccess,
   syncCloudbedsReservations,

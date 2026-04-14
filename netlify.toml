@@ -38,6 +38,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/internal/cloudbeds-debug-notes"
+  to = "/.netlify/functions/cloudbeds-debug-notes"
+  status = 200
+
+[[redirects]]
   from = "/api/dashboard-reservations"
   to = "/.netlify/functions/dashboard-reservations"
   status = 200
