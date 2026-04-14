@@ -374,19 +374,28 @@ function extractRoomName(record) {
 function normalizeChannel(sourceName, sourceId) {
   const key = normalizeKey(sourceName || sourceId);
   if (!key) return 'unknown';
-  if (key.includes('booking')) return 'booking';
-  if (key.includes('expedia')) return 'expedia';
-  if (key.includes('airbnb')) return 'airbnb';
-  if (key.includes('vrbo') || key.includes('homeaway')) return 'vrbo';
+  // Check direct channels first — "Website/Booking Engine" contains "booking"
+  // so it must be matched before the Booking.com check.
   if (
     key.includes('website') ||
     key.includes('booking_engine') ||
+    key.includes('motor') ||
+    key.includes('sitio') ||
     key.includes('walk_in') ||
     key.includes('walkin') ||
+    key.includes('mostrador') ||
+    key.includes('recepcion') ||
+    key.includes('telefono') ||
+    key.includes('whatsapp') ||
+    key.includes('directo') ||
     key.includes('direct')
   ) {
     return 'direct';
   }
+  if (key.includes('booking')) return 'booking';
+  if (key.includes('expedia')) return 'expedia';
+  if (key.includes('airbnb')) return 'airbnb';
+  if (key.includes('vrbo') || key.includes('homeaway')) return 'vrbo';
   return slugify(sourceName || sourceId) || 'unknown';
 }
 
