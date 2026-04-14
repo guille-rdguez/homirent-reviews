@@ -43,6 +43,19 @@
   status = 200
 
 [[redirects]]
+  from = "/api/internal/google-reviews-sync"
+  to = "/.netlify/functions/google-reviews-sync"
+  status = 200
+
+[[redirects]]
+  from = "/api/dashboard-google-reviews"
+  to = "/.netlify/functions/dashboard-google-reviews"
+  status = 200
+
+[functions."google-reviews-cron"]
+  schedule = "0 13 * * *"
+
+[[redirects]]
   from = "/api/dashboard-reservations"
   to = "/.netlify/functions/dashboard-reservations"
   status = 200
