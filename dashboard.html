@@ -1655,7 +1655,7 @@ function renderGoogleReviews(){
           <div style="color:var(--text2);font-size:13px;line-height:1.5">${safeText(r.comment,'Sin comentario')}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
-          ${reviewUrl?`<a href="${escapeHtml(reviewUrl)}" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="text-decoration:none;text-align:center">Responder en Google ↗</a>`:''}
+          <a href="https://business.google.com/reviews?authuser=reservas%40homirent.com" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="text-decoration:none;text-align:center">Responder en Google ↗</a>
           <button class="btn btn-ghost btn-sm" onclick="toggleGoogleResponded(${safeJsArg(r.id)},${responded})">${responded?'Marcar pendiente':'Marcar respondida'}</button>
         </div>
       </div>
