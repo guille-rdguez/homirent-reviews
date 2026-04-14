@@ -38,6 +38,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/internal/google-find-place-ids"
+  to = "/.netlify/functions/google-find-place-ids"
+  status = 200
+
+[[redirects]]
   from = "/api/dashboard-reservations"
   to = "/.netlify/functions/dashboard-reservations"
   status = 200
