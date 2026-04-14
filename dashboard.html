@@ -1642,7 +1642,7 @@ function renderGoogleReviews(){
   if(!googleFiltered.length){el.innerHTML='<div class="card" style="padding:32px;text-align:center;color:var(--text3)">Sin resultados</div>';return;}
   el.innerHTML=googleFiltered.map(r=>{
     const responded=r.responded;
-    const reviewUrl=r.review_url||'';
+    const placeReviewsUrl=r.place_id?`https://search.google.com/local/reviews?placeid=${encodeURIComponent(r.place_id)}&authuser=reservas%40homirent.com`:'https://business.google.com/reviews?authuser=reservas%40homirent.com';
     return `<div class="card" style="padding:16px 20px;opacity:${responded?'0.6':'1'}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
@@ -1656,7 +1656,7 @@ function renderGoogleReviews(){
           <div style="color:var(--text2);font-size:13px;line-height:1.5">${safeText(r.comment,'Sin comentario')}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
-          <a href="https://business.google.com/reviews?authuser=reservas%40homirent.com" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="text-decoration:none;text-align:center">Responder en Google ↗</a>
+          <a href="${escapeHtml(placeReviewsUrl)}" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="text-decoration:none;text-align:center">Responder en Google ↗</a>
           <button class="btn btn-ghost btn-sm" onclick="toggleGoogleResponded(${safeJsArg(r.id)},${responded})">${responded?'Marcar pendiente':'Marcar respondida'}</button>
         </div>
       </div>
