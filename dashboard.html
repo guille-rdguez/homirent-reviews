@@ -912,6 +912,7 @@ body.auth-ready .auth-screen { display:none; }
       <div class="fbar">
         <select class="fsel" id="fcity" onchange="applyTableFilters()"><option value="">Todas las ciudades</option></select>
         <select class="fsel" id="fprop" onchange="applyTableFilters()"><option value="">Todos los complejos</option></select>
+        <select class="fsel" id="fchannel" onchange="applyTableFilters()"><option value="">Todas las plataformas</option><option value="expedia">Expedia</option><option value="booking">Booking.com</option><option value="airbnb">Airbnb</option><option value="direct">Directo</option><option value="unknown">Otro</option></select>
         <select class="fsel" id="frating" onchange="applyTableFilters()"><option value="">Todos los ratings</option><option value="5">⭐⭐⭐⭐⭐ 5</option><option value="4">⭐⭐⭐⭐ 4</option><option value="3">⭐⭐⭐ 3</option><option value="low">⭐⭐ 2 o menos</option></select>
         <button class="btn btn-ghost btn-sm" onclick="exportCsv()">Export CSV</button>
       </div>
@@ -1477,6 +1478,7 @@ function buildPropFilter(){
 function renderAll(){renderDash();applyTableFilters();renderAnalytics();renderLinks();}
 
 function rc(n){return n<=2?'var(--red)':n===3?'var(--amber)':'var(--green-acc)';}
+function toggleComment(id){const el=document.getElementById(id);if(!el)return;const expanded=el.dataset.expanded==='1';el.style.webkitLineClamp=expanded?'2':'unset';el.style.display=expanded?'-webkit-box':'block';el.dataset.expanded=expanded?'0':'1';}
 function starsStr(r){const f=Math.round(r);return '★'.repeat(f)+'☆'.repeat(5-f);}
 
 function renderDash(){
@@ -1533,11 +1535,12 @@ function renderPerf(reviews){
 }
 
 function applyTableFilters(){
-  const city=document.getElementById('fcity').value,propId=document.getElementById('fprop').value,rating=document.getElementById('frating').value;
+  const city=document.getElementById('fcity').value,propId=document.getElementById('fprop').value,rating=document.getElementById('frating').value,channel=document.getElementById('fchannel').value;
   let rows=filtered;
   if(city)rows=rows.filter(r=>r.properties?.city===city);
   if(propId)rows=rows.filter(r=>r.property_id===propId);
-  if(rating==='5')rows=rows.filter(r=>r.rating===5);else if(rating==='4')rows=rows.filter(r=>r.rating===4);else if(rating==='3')rows=rows.filter(r=>r.rating===3);else if(rating==='low')rows=rows.filter(r=>r.rating<=2);
+  if(channel)rows=rows.filter(r=>(r.channel||'unknown')===channel);
+  if(rating==='5')rows=rows.filter(r=>r.rating===5);else if(rating==='4')rows=rows.filter(r=>r.rating===4);else if(rating==='3')rows=rows.filter(r=>r.rating===3);else if(rating==='low')rows=rows.filter(r=>r.rating!=null&&r.rating<=2);
   tableRows=rows;
   document.getElementById('rcountlbl').textContent=`${rows.length} reviews en el periodo`;renderTable(rows);
 }
@@ -1545,13 +1548,30 @@ function applyTableFilters(){
 function renderTable(reviews){
   const tb=document.getElementById('rtbody');
   if(!reviews.length){tb.innerHTML='<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--text3)">Sin reviews para estos filtros</td></tr>';return;}
+  const CHAN_LABEL={expedia:'Expedia',booking:'Booking',airbnb:'Airbnb',direct:'Directo',unknown:'Otro'};
   tb.innerHTML=reviews.map(r=>{
     const prop=safeText(r.properties?.name),city=safeCity(r.properties?.city),rCol=rc(r.rating),ret=r.would_return===true?'<span class="tag tg">👍 Sí</span>':r.would_return===false?'<span class="tag ta">🤔 No</span>':'—';
     const isDeleting=deletingReviewIds.has(r.id);
     const reviewUrl=r.raw_payload?.parsed_fields?.reviewUrl;
     const ratingDisplay=r.rating!=null?`<span style="font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;color:${rCol}">${r.rating}★</span>${r.rating<=2?' <span class="abadge">!</span>':''}`:'-';
     const verBtn=reviewUrl?`<a href="${reviewUrl}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="text-decoration:none">Ver ↗</a>`:'';
-    return `<tr><td style="font-weight:600;color:var(--text)">${safeText(r.guest_name,'Anónimo')}</td><td>${safeText(r.room_name)}</td><td style="font-weight:500">${prop}</td><td style="font-size:11px;color:var(--text3)">${city}</td><td>${ratingDisplay}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeText(r.comment)}</td><td>${ret}</td><td><span class="stag">${safeText(r.source,'form')}</span></td><td style="white-space:nowrap;font-size:11px;color:var(--text3)">${fmtDate(r.created_at)}</td><td style="display:flex;gap:4px;flex-wrap:wrap">${verBtn}<button class="btn btn-danger btn-sm" onclick="deleteReview(${safeJsArg(r.id)},${safeJsArg(r.guest_name||'Anónimo')})" ${isDeleting?'disabled':''}>${isDeleting?'Borrando...':'Borrar'}</button></td></tr>`;
+    const chanLabel=CHAN_LABEL[r.channel]||safeText(r.source,'—');
+    const commentId=`cmt-${r.id}`;
+    const comment=safeText(r.comment,'—');
+    return `<tr>
+      <td style="font-weight:600;color:var(--text)">${safeText(r.guest_name,'Anónimo')}</td>
+      <td>${safeText(r.room_name)}</td>
+      <td style="font-weight:500">${prop}</td>
+      <td style="font-size:11px;color:var(--text3)">${city}</td>
+      <td>${ratingDisplay}</td>
+      <td style="max-width:260px;cursor:pointer" onclick="toggleComment('${commentId}')" title="Click para expandir">
+        <div id="${commentId}" style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:12px;color:var(--text2)">${comment}</div>
+      </td>
+      <td>${ret}</td>
+      <td><span class="stag">${chanLabel}</span></td>
+      <td style="white-space:nowrap;font-size:11px;color:var(--text3)">${fmtDate(r.created_at)}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">${verBtn}<button class="btn btn-danger btn-sm" onclick="deleteReview(${safeJsArg(r.id)},${safeJsArg(r.guest_name||'Anónimo')})" ${isDeleting?'disabled':''}>${isDeleting?'Borrando...':'Borrar'}</button></td>
+    </tr>`;
   }).join('');
 }
 

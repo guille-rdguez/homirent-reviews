@@ -202,7 +202,7 @@ async function fetchDashboardData() {
   const propertiesUrl =
     `${url}/rest/v1/properties?select=id,city,name&active=eq.true&order=city,name`;
   const reviewsUrl =
-    `${url}/rest/v1/reviews?select=id,guest_name,room_name,rating,comment,would_return,source,created_at,property_id,raw_payload,properties(name,city)&order=created_at.desc&limit=2000`;
+    `${url}/rest/v1/reviews?select=id,guest_name,room_name,rating,comment,would_return,source,channel,created_at,property_id,raw_payload,properties(name,city)&order=created_at.desc&limit=2000`;
 
   const [propertiesRes, reviewsRes] = await Promise.all([
     fetch(propertiesUrl, { headers }),
