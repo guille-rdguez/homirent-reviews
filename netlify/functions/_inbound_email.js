@@ -771,7 +771,14 @@ async function processInboundMessage({ inboundMessageId, externalMessageId, conn
     throw new Error('Inbound message no encontrado');
   }
 
-  const parsed = message.metadata?.parsed_fields || {};
+  // Re-parsear con el parser actualizado para obtener campos nuevos (ej. propertyNameHint)
+  const freshParsed = parseInboundFields({
+    rawText: message.raw_text,
+    rawHtml: message.raw_html,
+    subject: message.subject,
+    headers: message.headers,
+  });
+  const parsed = { ...(message.metadata?.parsed_fields || {}), ...freshParsed };
   const messageType = message.metadata?.message_type || 'other';
   if (!force && messageType !== 'review_notification') {
     const updatedRows = await supabasePatch(

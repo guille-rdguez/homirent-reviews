@@ -28,7 +28,8 @@ exports.handler = async (event) => {
   if (!access.ok) return access.error;
 
   try {
-    const messages = await getPendingMessages('needs_review');
+    const all = await getPendingMessages('needs_review');
+    const messages = all.slice(0, 20); // max 20 por llamada para evitar timeout
     let matched = 0;
     let ignored = 0;
     let errors = 0;
@@ -37,7 +38,6 @@ exports.handler = async (event) => {
       try {
         const result = await processInboundMessage({ inboundMessageId: id, force: false });
         if (result.status === 'matched') matched++;
-        else if (result.status === 'ignored') ignored++;
         else ignored++;
       } catch (err) {
         console.error(`[reprocess-batch] Error en ${id}:`, err.message);
@@ -47,7 +47,8 @@ exports.handler = async (event) => {
 
     return json(200, {
       ok: true,
-      total: messages.length,
+      processed: messages.length,
+      remaining: all.length - messages.length,
       matched,
       ignored,
       errors,
