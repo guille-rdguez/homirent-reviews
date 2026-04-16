@@ -693,9 +693,6 @@ async function findExistingReview({ channel, externalReviewId }) {
 }
 
 async function createOrUpdateReview({ message, parsed, match }) {
-  if (!parsed.rating) {
-    throw new Error('No se puede crear review sin rating parseado');
-  }
   if (!match?.propertyId) {
     throw new Error('No se puede crear review sin property_id resuelto');
   }
@@ -813,7 +810,8 @@ async function processInboundMessage({ inboundMessageId, externalMessageId, conn
   let matchToUse = best;
 
   // Fallback: si el matching estándar no alcanzó el umbral, buscar por nombre de propiedad
-  if (!shouldCreateReview && parsed.propertyNameHint && parsed.rating) {
+  // No requerimos rating — algunos emails de Expedia son solo notificaciones sin el contenido embebido
+  if (!shouldCreateReview && parsed.propertyNameHint) {
     const propByName = await findPropertyByName(parsed.propertyNameHint);
     if (propByName) {
       matchToUse = {
