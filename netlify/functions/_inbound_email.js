@@ -183,6 +183,22 @@ function extractRating(corpus) {
   return null;
 }
 
+// Detecta si un texto es boilerplate de email de notificación (no comentario real)
+const EMAIL_BOILERPLATE = [
+  'preheader text here',
+  'responda pronto a sus hu',
+  'ver en el navegador',
+  'tiene un nuevo comentario',
+  'un hu\u00e9sped que se qued\u00f3',
+  'aparece en los sitios de expedia',
+  'take a minute to respond',
+  'noreply@expedia',
+];
+function isBoilerplate(text) {
+  const lower = text.toLowerCase();
+  return EMAIL_BOILERPLATE.some((b) => lower.includes(b));
+}
+
 function extractReviewText(rawText, rawHtml) {
   const text = normalizeText(rawText || stripHtml(rawHtml));
   if (!text) return '';
@@ -191,21 +207,22 @@ function extractReviewText(rawText, rawHtml) {
   const expediaComment = /(?:Decepcionante|Regular|Aceptable|Bueno|Muy\s+bueno|Excelente|Poor|Fair|Good|Very\s+Good|Excellent|Disappointing|Terrible)\s+([\s\S]{20,2000}?)\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\s+\d{1,2}\b/i.exec(text);
   if (expediaComment?.[1]) {
     const comment = normalizeText(expediaComment[1]);
-    if (comment.length >= 15) return comment;
+    if (comment.length >= 15 && !isBoilerplate(comment)) return comment;
   }
 
   const labeled = extractFirstMatch(text, [
     /(?:review|comentario|comment|feedback)\s*[:\-]\s*[“”]?(.{10,500})[“”]?/i,
   ]);
-  if (labeled) return labeled;
+  if (labeled && !isBoilerplate(labeled)) return labeled;
 
   const quoted = extractFirstMatch(text, [/[\””](.{12,500}?)[\””]/]);
-  if (quoted) return quoted;
+  if (quoted && !isBoilerplate(quoted)) return quoted;
 
+  // Fallback: primera frase significativa — solo si no es boilerplate de email
   const sentences = text
     .split(/(?<=[.!?])\s+/)
     .map((part) => normalizeText(part))
-    .filter((part) => part.length >= 20);
+    .filter((part) => part.length >= 20 && !isBoilerplate(part));
   return sentences[0] || '';
 }
 

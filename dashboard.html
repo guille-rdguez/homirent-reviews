@@ -1556,7 +1556,10 @@ function renderTable(reviews){
     const ratingDisplay=r.rating!=null?`<span style="font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;color:${rCol}">${r.rating}★</span>${r.rating<=2?' <span class="abadge">!</span>':''}`:'-';
     const verBtn=reviewUrl?`<a href="${reviewUrl}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="text-decoration:none">Ver ↗</a>`:'';
     const chanLabel=CHAN_LABEL[r.channel]||safeText(r.source,'—');
-    const comment=safeText(r.comment,'—');
+    const BPLATE=['preheader text here','responda pronto a sus hu','ver en el navegador','tiene un nuevo comentario','aparece en los sitios de expedia','take a minute to respond'];
+    const rawComment=r.comment||'';
+    const commentIsBoilerplate=rawComment&&BPLATE.some(b=>rawComment.toLowerCase().includes(b));
+    const comment=commentIsBoilerplate?'—':safeText(rawComment,'—');
     return `<tr>
       <td style="font-weight:600;color:var(--text)">${safeText(r.guest_name,'Anónimo')}</td>
       <td>${safeText(r.room_name)}</td>
