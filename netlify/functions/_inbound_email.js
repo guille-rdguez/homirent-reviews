@@ -160,6 +160,10 @@ function extractRating(corpus) {
     /(?:rating|calificacion|calificación|stars|estrellas)[^\d]{0,10}([1-5](?:[.,]\d)?)(?:\s*\/\s*5)?/i,
     /([1-5](?:[.,]\d)?)\s*\/\s*5/i,
     /([1-5])\s*(?:stars|estrellas)\b/i,
+    // Expedia: "2.0 Decepcionante" / "4.0 Excelente"
+    /\b([1-5](?:[.,]\d{1,2})?)\s+(?:Decepcionante|Regular|Aceptable|Bueno|Muy\s+bueno|Excelente|Poor|Fair|Good|Very\s+Good|Excellent|Disappointing|Terrible)\b/i,
+    // OTA: standalone number followed by review title or score label
+    /\bpuntaje[^\d]{0,10}([1-5](?:[.,]\d)?)/i,
   ];
   for (const pattern of patterns) {
     const match = pattern.exec(corpus);
@@ -204,8 +208,15 @@ function parseInboundFields({ rawText, rawHtml, subject, headers }) {
 
   const guestName = extractFirstMatch(corpus, [
     /(?:guest|hu[eé]sped|traveler|traveller|usuario)\s*(?:name)?\s*[:\-]\s*([A-ZÁÉÍÓÚÑ][^\n<]{2,80})/i,
-    /review from\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ'’.\-\s]{2,80})/i,
-    /reseña de\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ'’.\-\s]{2,80})/i,
+    /review from\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ’’.\-\s]{2,80})/i,
+    /reseña de\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ’’.\-\s]{2,80})/i,
+    // Expedia: guest name appears just before the date at end of review
+    /([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ’\-]+){1,3})\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}/i,
+  ]);
+
+  // Expedia/OTA: property name in greeting "Hola, {Property}:" or "Hello, {Property}:"
+  const propertyNameHint = extractFirstMatch(corpus, [
+    /(?:Hola|Hello),\s+([^:,<\n]{3,120}):/i,
   ]);
 
   const externalReservationId = extractFirstMatch(corpus, [
@@ -233,6 +244,7 @@ function parseInboundFields({ rawText, rawHtml, subject, headers }) {
     externalReviewId: externalReviewId || null,
     listingIdHint: listingIdHint || null,
     listingName: listingName || null,
+    propertyNameHint: propertyNameHint || null,
     rating,
     reviewText: reviewText || null,
   };
@@ -630,6 +642,26 @@ async function loadProcessingContext(message) {
   };
 }
 
+async function findPropertyByName(nameHint) {
+  if (!nameHint) return null;
+  const hint = normalizeKey(nameHint);
+  if (hint.length < 3) return null;
+  const properties = await supabaseSelect('properties?select=id,name&limit=100');
+  let best = null;
+  let bestScore = 0;
+  for (const prop of properties) {
+    const propName = normalizeKey(prop.name || '');
+    if (!propName) continue;
+    if (propName === hint) return prop;
+    const hintWords = hint.split(/\s+/).filter((w) => w.length > 2);
+    const propWords = propName.split(/\s+/).filter((w) => w.length > 2);
+    const matchCount = hintWords.filter((w) => propWords.includes(w)).length;
+    const score = matchCount / Math.max(hintWords.length, propWords.length, 1);
+    if (score > bestScore) { bestScore = score; best = prop; }
+  }
+  return bestScore >= 0.5 ? best : null;
+}
+
 function chooseBestCandidate(message, parsed, context) {
   const listingsById = new Map(context.listings.map((listing) => [listing.id, listing]));
   const candidates = [];
@@ -765,25 +797,46 @@ async function processInboundMessage({ inboundMessageId, externalMessageId, conn
   const context = await loadProcessingContext(message);
   const { best, topCandidates } = chooseBestCandidate(message, parsed, context);
   const threshold = getInboundConfig().autoMatchThreshold;
-  const shouldCreateReview =
+  let shouldCreateReview =
     Boolean(best) &&
     best.score >= threshold &&
     Boolean(parsed.rating) &&
     (Boolean(best.propertyId) || Boolean(best.reservationId));
 
+  let matchToUse = best;
+
+  // Fallback: si el matching estándar no alcanzó el umbral, buscar por nombre de propiedad
+  if (!shouldCreateReview && parsed.propertyNameHint && parsed.rating) {
+    const propByName = await findPropertyByName(parsed.propertyNameHint);
+    if (propByName) {
+      matchToUse = {
+        type: 'property_name_hint',
+        score: 0.7,
+        reasons: ['property_name_hint'],
+        reservation: null,
+        listing: null,
+        propertyId: propByName.id,
+        reservationId: null,
+        listingId: null,
+        sourceAccountId: message.source_account_id || null,
+      };
+      shouldCreateReview = true;
+    }
+  }
+
   let review = null;
   let status = 'needs_review';
 
   if (shouldCreateReview) {
-    review = await createOrUpdateReview({ message, parsed, match: best });
+    review = await createOrUpdateReview({ message, parsed, match: matchToUse });
     status = 'matched';
   }
 
   const updatedRows = await supabasePatch(
     `inbound_messages?id=eq.${encodeURIComponent(message.id)}`,
     {
-      property_id: best?.propertyId || null,
-      reservation_id: best?.reservationId || null,
+      property_id: matchToUse?.propertyId || null,
+      reservation_id: matchToUse?.reservationId || null,
       parse_status: status,
       metadata: {
         ...(message.metadata || {}),

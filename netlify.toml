@@ -75,6 +75,11 @@
   to = "/.netlify/functions/process-inbound-message"
   status = 200
 
+[[redirects]]
+  from = "/api/internal/reprocess-inbound-batch"
+  to = "/.netlify/functions/reprocess-inbound-batch"
+  status = 200
+
 [[headers]]
   for = "/*.html"
   [headers.values]
