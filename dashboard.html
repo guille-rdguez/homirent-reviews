@@ -1506,8 +1506,8 @@ function renderRecent(reviews){
         <div style="font-size:13px;font-weight:600;color:var(--text)">${guest} <span style="font-weight:400;color:var(--text3);font-size:12px">· ${room} · ${prop}</span></div>
         <div style="font-size:12px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${comment}</div>
       </div>
-      <div style="font-family:var(--font-head);font-size:15px;font-weight:700;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;color:${rCol};flex-shrink:0">${r.rating}★</div>
-      <div style="font-size:10px;color:var(--text3);flex-shrink:0">${timeAgo(r.created_at)}</div>
+      <div style="font-family:var(--font-head);font-size:15px;font-weight:700;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;color:${rCol};flex-shrink:0">${r.rating!=null?r.rating+'★':'-'}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0">${r.raw_payload?.parsed_fields?.reviewUrl?`<a href="${r.raw_payload.parsed_fields.reviewUrl}" target="_blank" rel="noopener" style="font-size:10px;color:var(--primary);text-decoration:none" title="Ver en Expedia">Ver ↗</a>`:''}<span style="font-size:10px;color:var(--text3)">${timeAgo(r.created_at)}</span></div>
     </div>`;
   }).join('');
 }
@@ -1548,7 +1548,10 @@ function renderTable(reviews){
   tb.innerHTML=reviews.map(r=>{
     const prop=safeText(r.properties?.name),city=safeCity(r.properties?.city),rCol=rc(r.rating),ret=r.would_return===true?'<span class="tag tg">👍 Sí</span>':r.would_return===false?'<span class="tag ta">🤔 No</span>':'—';
     const isDeleting=deletingReviewIds.has(r.id);
-    return `<tr><td style="font-weight:600;color:var(--text)">${safeText(r.guest_name,'Anónimo')}</td><td>${safeText(r.room_name)}</td><td style="font-weight:500">${prop}</td><td style="font-size:11px;color:var(--text3)">${city}</td><td><span style="font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;color:${rCol}">${r.rating}★</span>${r.rating<=2?' <span class="abadge">!</span>':''}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeText(r.comment)}</td><td>${ret}</td><td><span class="stag">${safeText(r.source,'form')}</span></td><td style="white-space:nowrap;font-size:11px;color:var(--text3)">${fmtDate(r.created_at)}</td><td><button class="btn btn-danger btn-sm" onclick="deleteReview(${safeJsArg(r.id)},${safeJsArg(r.guest_name||'Anónimo')})" ${isDeleting?'disabled':''}>${isDeleting?'Borrando...':'Borrar'}</button></td></tr>`;
+    const reviewUrl=r.raw_payload?.parsed_fields?.reviewUrl;
+    const ratingDisplay=r.rating!=null?`<span style="font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;color:${rCol}">${r.rating}★</span>${r.rating<=2?' <span class="abadge">!</span>':''}`:'-';
+    const verBtn=reviewUrl?`<a href="${reviewUrl}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="text-decoration:none">Ver ↗</a>`:'';
+    return `<tr><td style="font-weight:600;color:var(--text)">${safeText(r.guest_name,'Anónimo')}</td><td>${safeText(r.room_name)}</td><td style="font-weight:500">${prop}</td><td style="font-size:11px;color:var(--text3)">${city}</td><td>${ratingDisplay}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeText(r.comment)}</td><td>${ret}</td><td><span class="stag">${safeText(r.source,'form')}</span></td><td style="white-space:nowrap;font-size:11px;color:var(--text3)">${fmtDate(r.created_at)}</td><td style="display:flex;gap:4px;flex-wrap:wrap">${verBtn}<button class="btn btn-danger btn-sm" onclick="deleteReview(${safeJsArg(r.id)},${safeJsArg(r.guest_name||'Anónimo')})" ${isDeleting?'disabled':''}>${isDeleting?'Borrando...':'Borrar'}</button></td></tr>`;
   }).join('');
 }
 

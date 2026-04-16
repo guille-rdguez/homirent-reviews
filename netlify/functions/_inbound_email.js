@@ -156,13 +156,20 @@ function classifyMessageType({ subject, rawText, rawHtml, channelGuess }) {
 }
 
 function extractRating(corpus) {
+  // Expedia usa escala 1-10 con etiqueta (ej. "6.0 Bueno", "10.0 Excelente") — convertir a 1-5
+  const expediaMatch = /\b(10(?:[.,]0)?|[1-9](?:[.,]\d{1,2})?)\s+(?:Decepcionante|Regular|Aceptable|Bueno|Muy\s+bueno|Excelente|Poor|Fair|Good|Very\s+Good|Excellent|Disappointing|Terrible)\b/i.exec(corpus);
+  if (expediaMatch?.[1]) {
+    const raw = Number.parseFloat(String(expediaMatch[1]).replace(',', '.'));
+    if (Number.isFinite(raw) && raw >= 1 && raw <= 10) {
+      return Math.max(1, Math.min(5, Math.round(raw / 2)));
+    }
+  }
+
+  // Escala estándar 1-5
   const patterns = [
     /(?:rating|calificacion|calificación|stars|estrellas)[^\d]{0,10}([1-5](?:[.,]\d)?)(?:\s*\/\s*5)?/i,
     /([1-5](?:[.,]\d)?)\s*\/\s*5/i,
     /([1-5])\s*(?:stars|estrellas)\b/i,
-    // Expedia: "2.0 Decepcionante" / "4.0 Excelente"
-    /\b([1-5](?:[.,]\d{1,2})?)\s+(?:Decepcionante|Regular|Aceptable|Bueno|Muy\s+bueno|Excelente|Poor|Fair|Good|Very\s+Good|Excellent|Disappointing|Terrible)\b/i,
-    // OTA: standalone number followed by review title or score label
     /\bpuntaje[^\d]{0,10}([1-5](?:[.,]\d)?)/i,
   ];
   for (const pattern of patterns) {
@@ -179,12 +186,20 @@ function extractRating(corpus) {
 function extractReviewText(rawText, rawHtml) {
   const text = normalizeText(rawText || stripHtml(rawHtml));
   if (!text) return '';
+
+  // Expedia: el comentario aparece entre la etiqueta de calificación y el nombre+fecha del huésped
+  const expediaComment = /(?:Decepcionante|Regular|Aceptable|Bueno|Muy\s+bueno|Excelente|Poor|Fair|Good|Very\s+Good|Excellent|Disappointing|Terrible)\s+([\s\S]{20,2000}?)\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\s+\d{1,2}\b/i.exec(text);
+  if (expediaComment?.[1]) {
+    const comment = normalizeText(expediaComment[1]);
+    if (comment.length >= 15) return comment;
+  }
+
   const labeled = extractFirstMatch(text, [
-    /(?:review|comentario|comment|feedback)\s*[:\-]\s*["“]?(.{10,500})["”]?/i,
+    /(?:review|comentario|comment|feedback)\s*[:\-]\s*[“”]?(.{10,500})[“”]?/i,
   ]);
   if (labeled) return labeled;
 
-  const quoted = extractFirstMatch(text, [/[\"“](.{12,500}?)[\"”]/]);
+  const quoted = extractFirstMatch(text, [/[\””](.{12,500}?)[\””]/]);
   if (quoted) return quoted;
 
   const sentences = text
@@ -210,14 +225,24 @@ function parseInboundFields({ rawText, rawHtml, subject, headers }) {
     /(?:guest|hu[eé]sped|traveler|traveller|usuario)\s*(?:name)?\s*[:\-]\s*([A-ZÁÉÍÓÚÑ][^\n<]{2,80})/i,
     /review from\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ’’.\-\s]{2,80})/i,
     /reseña de\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ’’.\-\s]{2,80})/i,
-    // Expedia: guest name appears just before the date at end of review
-    /([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ’\-]+){1,3})\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}/i,
+    // Expedia: nombre del huésped (puede ser solo nombre) justo antes de mes+día
+    /([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ’\-]+){0,3})\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}\b/i,
   ]);
 
   // Expedia/OTA: property name in greeting "Hola, {Property}:" or "Hello, {Property}:"
   const propertyNameHint = extractFirstMatch(corpus, [
     /(?:Hola|Hello),\s+([^:,<\n]{3,120}):/i,
   ]);
+
+  // Expedia: URL del botón "Ver y responder" / "View and respond" en el HTML
+  const reviewUrl = (() => {
+    if (!rawHtml) return '';
+    const m = /href="(https:\/\/link\.expediapartnercentral\.com\/[^"]+)"[^>]*>[\s\S]{0,200}?(?:Ver\s+y\s+responder|View\s+and\s+respond)/i.exec(rawHtml);
+    if (m?.[1]) return m[1];
+    // fallback: primer link de expediapartnercentral que no sea imagen ni unsubscribe
+    const m2 = /href="(https:\/\/link\.expediapartnercentral\.com\/c\/[^"]+)"/i.exec(rawHtml);
+    return m2?.[1] || '';
+  })();
 
   const externalReservationId = extractFirstMatch(corpus, [
     /(?:reservation|booking|confirmation|reserva)\s*(?:id|code|number|no\.?|#)?\s*[:\-]?\s*([A-Z0-9\-]{5,40})/i,
@@ -247,6 +272,7 @@ function parseInboundFields({ rawText, rawHtml, subject, headers }) {
     propertyNameHint: propertyNameHint || null,
     rating,
     reviewText: reviewText || null,
+    reviewUrl: reviewUrl || null,
   };
 }
 
