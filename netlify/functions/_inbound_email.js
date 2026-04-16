@@ -242,8 +242,11 @@ function parseInboundFields({ rawText, rawHtml, subject, headers }) {
     /(?:guest|hu[eé]sped|traveler|traveller|usuario)\s*(?:name)?\s*[:\-]\s*([A-ZÁÉÍÓÚÑ][^\n<]{2,80})/i,
     /review from\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ’’.\-\s]{2,80})/i,
     /reseña de\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ’’.\-\s]{2,80})/i,
-    // Expedia: nombre del huésped (puede ser solo nombre) justo antes de mes+día
-    /([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ’\-]+){0,3})\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}\b/i,
+    // Expedia: nombre con mayúscula inicial real (sin /i para no capturar palabras en minúscula del comentario)
+    // Ej: "Sonia Apr 13", "Felix Antonio Valdez Apr 13", "Cruz Cazares Apr 13"
+    /([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ’\-]+){0,2})\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Ene|Feb|Mar|Abr|May|Jun|Jul|Ago|Sep|Oct|Nov|Dic)\s+\d{1,2}\b/,
+    // Expedia: nombre en mayúsculas (SONIA, GERARDO) — solo una o dos palabras
+    /([A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,})?)\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Ene|Feb|Mar|Abr|May|Jun|Jul|Ago|Sep|Oct|Nov|Dic)\s+\d{1,2}\b/,
   ]);
 
   // Expedia/OTA: property name in greeting "Hola, {Property}:" or "Hello, {Property}:"
