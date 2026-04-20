@@ -1445,7 +1445,11 @@ async function loadAll(){
   try{
     const data=await apiRequest(API_DATA);
     allProps=data.properties||[];
-    allReviews=data.reviews||[];
+    allReviews=(data.reviews||[]).map(r=>{
+      // Expedia emails guardados antes del fix pueden traer rating 1-10; normalizar a 1-5
+      if(r.rating!=null&&r.rating>5)r={...r,rating:Math.max(1,Math.min(5,Math.round(r.rating/2)))};
+      return r;
+    });
     allProps.sort(propertySort);
     syncPropertyViews();
     dateFrom=new Date();dateFrom.setDate(dateFrom.getDate()-7);dateFrom.setHours(0,0,0,0);dateTo=new Date();
@@ -1504,7 +1508,7 @@ function renderRecent(reviews){
     const init=safeText((r.guest_name||'?').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?','?');
     const col=AVC[i%AVC.length],guest=safeText(r.guest_name,'Anónimo'),room=safeText(r.room_name),prop=safeText(r.properties?.name),comment=safeText(r.comment,'Sin comentario'),rCol=rc(r.rating);
     const chanKey=r.channel||'unknown';
-    const CHAN_COLOR={expedia:'#1a6ed4',booking:'#003580',airbnb:'#ff385c',direct:'#2d9e6b',unknown:'#888'};
+    const CHAN_COLOR={expedia:'#b8860b',booking:'#003580',airbnb:'#ff385c',direct:'#2d9e6b',unknown:'#888'};
     const chanLabel=CHAN_LABEL[chanKey]||chanKey;
     const chanBadge=`<span style="font-size:10px;font-weight:600;color:#fff;background:${CHAN_COLOR[chanKey]||'#888'};border-radius:4px;padding:1px 5px;letter-spacing:0.02em">${chanLabel}</span>`;
     return `<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--border)">
