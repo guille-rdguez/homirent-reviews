@@ -50,6 +50,10 @@ function getAuthConfig() {
   const username = process.env.DASHBOARD_USERNAME || DEFAULT_AUTH_USER;
   const explicitHash = process.env.DASHBOARD_PASSWORD_HASH;
   const plainPassword = process.env.DASHBOARD_PASSWORD;
+  const usingDefaults = !process.env.DASHBOARD_USERNAME && !explicitHash && !plainPassword;
+  if (usingDefaults) {
+    console.warn('[dashboard] Usando credenciales por defecto — configura DASHBOARD_USERNAME y DASHBOARD_PASSWORD en produccion');
+  }
   const passwordHash =
     explicitHash ||
     (plainPassword ? sha256Hex(`${username}::${plainPassword}`) : DEFAULT_AUTH_HASH);
@@ -127,7 +131,10 @@ function verifySessionToken(token) {
 function validateCredentials(username, password) {
   const config = getAuthConfig();
   const digest = sha256Hex(`${username}::${password}`);
-  return username === config.username && timingSafeEqual(digest, config.passwordHash);
+  return (
+    timingSafeEqual(sha256Hex(username), sha256Hex(config.username)) &&
+    timingSafeEqual(digest, config.passwordHash)
+  );
 }
 
 function parseJsonBody(body) {

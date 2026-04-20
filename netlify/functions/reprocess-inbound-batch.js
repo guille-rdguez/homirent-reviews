@@ -6,7 +6,6 @@ async function getPendingMessages(status = 'needs_review') {
   const params = new URLSearchParams({
     select: 'id',
     parse_status: `eq.${status}`,
-    connector: 'eq.email',
     order: 'received_at.asc',
     limit: '200',
   });

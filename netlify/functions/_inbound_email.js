@@ -452,8 +452,10 @@ async function findExistingInboundMessage({ connector, externalMessageId, intern
   }
 
   if (internalHash) {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const connectorFilter = connector ? `&connector=eq.${encodeURIComponent(connector)}` : '';
     const rows = await supabaseSelect(
-      `inbound_messages?select=*&limit=50&order=received_at.desc`
+      `inbound_messages?select=id,metadata${connectorFilter}&received_at=gte.${since}&order=received_at.desc&limit=500`
     );
     return (
       rows.find((row) => normalizeText(row?.metadata?.internal_message_hash) === internalHash) ||
@@ -543,8 +545,6 @@ function listingNameScore(parsedListingName, listing) {
   if (!target) return { score: 0, reason: null };
   const candidates = [
     normalizeKey(listing.display_name),
-    normalizeKey(listing.external_listing_id),
-    normalizeKey(listing.external_property_id),
   ].filter(Boolean);
 
   for (const candidate of candidates) {
@@ -848,7 +848,6 @@ async function processInboundMessage({ inboundMessageId, externalMessageId, conn
   let shouldCreateReview =
     Boolean(best) &&
     best.score >= threshold &&
-    Boolean(parsed.rating) &&
     (Boolean(best.propertyId) || Boolean(best.reservationId));
 
   let matchToUse = best;
