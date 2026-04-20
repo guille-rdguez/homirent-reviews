@@ -1,6 +1,5 @@
-const { json, methodNotAllowed, serverError } = require('./_dashboard');
+const { json, methodNotAllowed, serverError, createSupabaseHeaders, getSupabaseConfig, readErrorText } = require('./_dashboard');
 const { processInboundMessage, requireInboundAccess } = require('./_inbound_email');
-const { createSupabaseHeaders, getSupabaseConfig, readErrorText } = require('./_dashboard');
 
 async function getPendingMessages(status = 'needs_review') {
   const { url } = getSupabaseConfig();

@@ -94,10 +94,8 @@ function inferChannel({ fromEmail, subject, rawText, rawHtml, sourceAccount }) {
   );
   if (!corpus) return null;
   if (corpus.includes('airbnb')) return 'airbnb';
-  if (corpus.includes('booking.com') || corpus.includes('booking com') || corpus.includes('booking')) {
-    return 'booking';
-  }
   if (corpus.includes('expedia')) return 'expedia';
+  if (corpus.includes('booking.com') || corpus.includes('booking com')) return 'booking';
   if (corpus.includes('vrbo') || corpus.includes('homeaway')) return 'vrbo';
   return null;
 }

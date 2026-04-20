@@ -18,7 +18,7 @@ exports.handler = async (event) => {
   const headers = createSupabaseHeaders();
 
   const params = new URLSearchParams({
-    select: 'id,guest_name,room_name,status,channel,check_in,check_out,booked_at,property_id,properties(name,city)',
+    select: 'id,guest_name,room_name,status,channel,check_in,check_out,property_id,properties(name,city)',
     order: 'check_out.desc',
     limit: '2000',
   });

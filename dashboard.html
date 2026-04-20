@@ -1118,6 +1118,7 @@ function resetDashboardState(){
   allGoogleReviews=[];
   googleFiltered=[];
   googleLoaded=false;
+  deletingReviewIds=new Set();
   if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}
   if(document.getElementById('property-form'))resetPropertyForm();
   document.getElementById('nbadge').style.display='none';
@@ -1484,7 +1485,7 @@ function starsStr(r){const f=Math.round(r);return '★'.repeat(f)+'☆'.repeat(5
 function renderDash(){
   const r=filtered;
   if(!r.length){['savg','stotal','sreturn','salerts'].forEach(id=>document.getElementById(id).textContent='—');document.getElementById('savgsub').textContent='Sin datos';document.getElementById('salerts').style.color='var(--text3)';document.getElementById('rrecent').innerHTML='<div class="empty"><div class="ei">📭</div>Sin reviews en este periodo</div>';document.getElementById('rdist').innerHTML='';document.getElementById('ralerts').innerHTML='<div style="font-size:12px;color:var(--text3)">✅ Sin alertas</div>';document.getElementById('rperf').innerHTML='<div class="empty">Sin datos</div>';return;}
-  const avg=r.reduce((s,v)=>s+v.rating,0)/r.length;
+  const rated=r.filter(v=>v.rating!=null);const avg=rated.length?rated.reduce((s,v)=>s+v.rating,0)/rated.length:0;
   document.getElementById('savg').textContent=avg.toFixed(1);
   document.getElementById('savgsub').textContent=starsStr(avg);
   document.getElementById('stotal').textContent=r.length;
@@ -1509,7 +1510,7 @@ function renderRecent(reviews){
         <div style="font-size:12px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${comment}</div>
       </div>
       <div style="font-family:var(--font-head);font-size:15px;font-weight:700;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;color:${rCol};flex-shrink:0">${r.rating!=null?r.rating+'★':'-'}</div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0">${r.raw_payload?.parsed_fields?.reviewUrl?`<a href="${r.raw_payload.parsed_fields.reviewUrl}" target="_blank" rel="noopener" style="font-size:10px;color:var(--primary);text-decoration:none" title="Ver en Expedia">Ver ↗</a>`:''}<span style="font-size:10px;color:var(--text3)">${timeAgo(r.created_at)}</span></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0">${r.raw_payload?.parsed_fields?.reviewUrl?`<a href="${r.raw_payload.parsed_fields.reviewUrl}" target="_blank" rel="noopener" style="font-size:10px;color:var(--blue-acc);text-decoration:none" title="Ver en Expedia">Ver ↗</a>`:''}<span style="font-size:10px;color:var(--text3)">${timeAgo(r.created_at)}</span></div>
     </div>`;
   }).join('');
 }
@@ -1527,7 +1528,7 @@ function renderAlerts(reviews){
 }
 
 function renderPerf(reviews){
-  const bp={};reviews.forEach(r=>{const k=r.property_id||'?';if(!bp[k])bp[k]={name:r.properties?.name||'—',city:r.properties?.city||'—',ratings:[],count:0};bp[k].ratings.push(r.rating);bp[k].count++;});
+  const bp={};reviews.forEach(r=>{const k=r.property_id||'?';if(!bp[k])bp[k]={name:r.properties?.name||'—',city:r.properties?.city||'—',ratings:[],count:0};if(r.rating!=null)bp[k].ratings.push(r.rating);bp[k].count++;});
   const props=Object.values(bp).map(p=>({...p,avg:p.ratings.reduce((s,v)=>s+v,0)/p.ratings.length})).sort((a,b)=>b.avg-a.avg);
   const maxC=Math.max(...props.map(p=>p.count),1);const c=document.getElementById('rperf');
   if(!props.length){c.innerHTML='<div class="empty">Sin datos</div>';return;}
@@ -1545,10 +1546,12 @@ function applyTableFilters(){
   document.getElementById('rcountlbl').textContent=`${rows.length} reviews en el periodo`;renderTable(rows);
 }
 
+const CHAN_LABEL={expedia:'Expedia',booking:'Booking',airbnb:'Airbnb',direct:'Directo',unknown:'Otro'};
+const BPLATE=['preheader text here','responda pronto a sus hu','ver en el navegador','tiene un nuevo comentario','aparece en los sitios de expedia','take a minute to respond','un hu\u00e9sped que se qued\u00f3','noreply@expedia'];
+
 function renderTable(reviews){
   const tb=document.getElementById('rtbody');
   if(!reviews.length){tb.innerHTML='<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--text3)">Sin reviews para estos filtros</td></tr>';return;}
-  const CHAN_LABEL={expedia:'Expedia',booking:'Booking',airbnb:'Airbnb',direct:'Directo',unknown:'Otro'};
   tb.innerHTML=reviews.map(r=>{
     const prop=safeText(r.properties?.name),city=safeCity(r.properties?.city),rCol=rc(r.rating),ret=r.would_return===true?'<span class="tag tg">👍 Sí</span>':r.would_return===false?'<span class="tag ta">🤔 No</span>':'—';
     const isDeleting=deletingReviewIds.has(r.id);
@@ -1556,7 +1559,6 @@ function renderTable(reviews){
     const ratingDisplay=r.rating!=null?`<span style="font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:-0.04em;font-variant-numeric:tabular-nums lining-nums;color:${rCol}">${r.rating}★</span>${r.rating<=2?' <span class="abadge">!</span>':''}`:'-';
     const verBtn=reviewUrl?`<a href="${reviewUrl}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="text-decoration:none">Ver ↗</a>`:'';
     const chanLabel=CHAN_LABEL[r.channel]||safeText(r.source,'—');
-    const BPLATE=['preheader text here','responda pronto a sus hu','ver en el navegador','tiene un nuevo comentario','aparece en los sitios de expedia','take a minute to respond'];
     const rawComment=r.comment||'';
     const commentIsBoilerplate=rawComment&&BPLATE.some(b=>rawComment.toLowerCase().includes(b));
     const comment=commentIsBoilerplate?'—':safeText(rawComment,'—');
@@ -1571,7 +1573,7 @@ function renderTable(reviews){
       </td>
       <td>${ret}</td>
       <td><span class="stag">${chanLabel}</span></td>
-      <td style="white-space:nowrap;font-size:11px;color:var(--text3)">${fmtDate(r.created_at)}</td>
+      <td style="white-space:nowrap;font-size:11px;color:var(--text3)">${fmtTimestamp(r.created_at)}</td>
       <td style="display:flex;gap:4px;flex-wrap:wrap">${verBtn}<button class="btn btn-danger btn-sm" onclick="deleteReview(${safeJsArg(r.id)},${safeJsArg(r.guest_name||'Anónimo')})" ${isDeleting?'disabled':''}>${isDeleting?'Borrando...':'Borrar'}</button></td>
     </tr>`;
   }).join('');
@@ -1579,7 +1581,7 @@ function renderTable(reviews){
 
 function renderAnalytics(){
   document.getElementById('asub').textContent=`${filtered.length} reviews · ${allProps.length} complejos activos`;
-  const bp={};filtered.forEach(r=>{const k=r.property_id||'?';if(!bp[k])bp[k]={name:r.properties?.name||'—',city:r.properties?.city||'—',ratings:[],returns:[],comments:[]};bp[k].ratings.push(r.rating);if(r.would_return!==null)bp[k].returns.push(r.would_return);if(r.comment)bp[k].comments.push(r.comment);});
+  const bp={};filtered.forEach(r=>{const k=r.property_id||'?';if(!bp[k])bp[k]={name:r.properties?.name||'—',city:r.properties?.city||'—',ratings:[],returns:[],comments:[]};if(r.rating!=null)bp[k].ratings.push(r.rating);if(r.would_return!==null)bp[k].returns.push(r.would_return);if(r.comment)bp[k].comments.push(r.comment);});
   const cards=Object.values(bp).map(p=>({...p,avg:p.ratings.reduce((s,v)=>s+v,0)/p.ratings.length})).sort((a,b)=>b.avg-a.avg);
   const c=document.getElementById('acards');
   if(!cards.length){c.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ei">📊</div>Sin datos</div>';return;}
@@ -1763,7 +1765,7 @@ function renderReservations(){
 function nav(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('page-'+page).classList.add('active');document.getElementById('ttitle').textContent=TITLES[page]||page;const el=[...document.querySelectorAll('.nav-item')].find(n=>n.getAttribute('onclick')?.includes("'"+page+"'"));if(el)el.classList.add('active');window.scrollTo(0,0);if(page==='reservaciones'&&!reservationsLoaded)loadReservations();if(page==='google'&&!googleLoaded)loadGoogleReviews();}
 
 function timeAgo(ds){const diff=Date.now()-new Date(ds).getTime();const m=Math.floor(diff/60000),h=Math.floor(m/60),d=Math.floor(h/24);if(m<1)return 'ahora';if(m<60)return `hace ${m}m`;if(h<24)return `hace ${h}h`;return `hace ${d}d`;}
-function fmtDate(ds){return new Date(ds).toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
+function fmtTimestamp(ds){return new Date(ds).toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});}
 function notify(icon,msg){const s=document.getElementById('nstack');const el=document.createElement('div');const iconEl=document.createElement('span');const msgEl=document.createElement('span');el.className='notif';iconEl.textContent=icon;msgEl.textContent=msg;el.append(iconEl,msgEl);s.appendChild(el);setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity 0.3s';setTimeout(()=>el.remove(),300);},3200);}
 function openForm(){window.open(FORM_URL,'_blank');}
 function copyLink(){copyText(formUrl(), 'Link general copiado');}

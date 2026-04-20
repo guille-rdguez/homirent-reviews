@@ -57,7 +57,9 @@ async function upsertGoogleReview(review, propertyId, placeId) {
   const headers = createSupabaseHeaders();
 
   const authorUri = review.authorAttribution?.uri || '';
-  const externalId = `google_${placeId}_${Buffer.from(authorUri || review.name || Math.random().toString()).toString('base64').slice(0, 16)}`;
+  // review.name es el resource name único de la API (places/xxx/reviews/xxx) — siempre determinístico
+  const idSource = review.name || `${placeId}:${review.publishTime || ''}:${review.authorAttribution?.displayName || ''}`;
+  const externalId = `google_${placeId}_${Buffer.from(idSource).toString('base64').slice(0, 24)}`;
 
   const row = {
     property_id: propertyId,
@@ -70,7 +72,7 @@ async function upsertGoogleReview(review, propertyId, placeId) {
     place_id: placeId,
     original_language: review.originalLanguage || null,
     published_at: review.publishTime || null,
-    responded: false,
+    // No incluir responded — preservar el valor existente en actualizaciones
   };
 
   const res = await fetch(
