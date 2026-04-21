@@ -154,11 +154,14 @@ function classifyMessageType({ subject, rawText, rawHtml, channelGuess }) {
 }
 
 function extractRating(corpus) {
-  // Expedia usa escala 1-10 con etiqueta (ej. "6.0 Bueno", "10.0 Excelente") — convertir a 1-5
+  // Expedia muestra la calificación con etiqueta (ej. "4.0 Muy bueno", "8.0 Excelente").
+  // El email de partner usa escala 1-5; el portal al huésped la muestra como 1-10 (×2).
+  // Si el valor extraído ya está en 1-5 lo usamos directo; si supera 5 lo convertimos.
   const expediaMatch = /\b(10(?:[.,]0)?|[1-9](?:[.,]\d{1,2})?)\s+(?:Decepcionante|Regular|Aceptable|Bueno|Muy\s+bueno|Excelente|Poor|Fair|Good|Very\s+Good|Excellent|Disappointing|Terrible)\b/i.exec(corpus);
   if (expediaMatch?.[1]) {
     const raw = Number.parseFloat(String(expediaMatch[1]).replace(',', '.'));
     if (Number.isFinite(raw) && raw >= 1 && raw <= 10) {
+      if (raw <= 5) return Math.round(raw);
       return Math.max(1, Math.min(5, Math.round(raw / 2)));
     }
   }
@@ -202,10 +205,11 @@ function extractReviewText(rawText, rawHtml) {
   if (!text) return '';
 
   // Expedia: el comentario aparece entre la etiqueta de calificación y el nombre+fecha del huésped
-  const expediaComment = /(?:Decepcionante|Regular|Aceptable|Bueno|Muy\s+bueno|Excelente|Poor|Fair|Good|Very\s+Good|Excellent|Disappointing|Terrible)\s+([\s\S]{20,2000}?)\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\s+\d{1,2}\b/i.exec(text);
+  // Mínimo 5 chars en regex para no excluir comentarios cortos ("Muy buena zona" = 14 chars)
+  const expediaComment = /(?:Decepcionante|Regular|Aceptable|Bueno|Muy\s+bueno|Excelente|Poor|Fair|Good|Very\s+Good|Excellent|Disappointing|Terrible)\s+([\s\S]{5,2000}?)\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\s+\d{1,2}\b/i.exec(text);
   if (expediaComment?.[1]) {
     const comment = normalizeText(expediaComment[1]);
-    if (comment.length >= 15 && !isBoilerplate(comment)) return comment;
+    if (comment.length >= 5 && !isBoilerplate(comment)) return comment;
   }
 
   const labeled = extractFirstMatch(text, [
