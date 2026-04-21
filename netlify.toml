@@ -80,6 +80,11 @@
   to = "/.netlify/functions/reprocess-inbound-batch"
   status = 200
 
+[[redirects]]
+  from = "/api/internal/reset-inbound-matched"
+  to = "/.netlify/functions/reset-inbound-matched"
+  status = 200
+
 [[headers]]
   for = "/*.html"
   [headers.values]

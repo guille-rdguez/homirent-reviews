@@ -849,6 +849,10 @@ body.auth-ready .auth-screen { display:none; }
       <svg viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>
       Copiar Link
     </div>
+    <div class="nav-item" id="btnReprocess" onclick="runReprocessEmails()">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+      Reprocesar Emails
+    </div>
   </nav>
   <div class="sidebar-footer">
     <div class="ws-pill">
@@ -1061,6 +1065,8 @@ const API_DELETE_REVIEW='/api/dashboard-delete-review';
 const API_LOGOUT='/api/dashboard-logout';
 const API_RESERVATIONS='/api/dashboard-reservations';
 const API_GOOGLE_REVIEWS='/api/dashboard-google-reviews';
+const API_RESET_INBOUND='/api/internal/reset-inbound-matched';
+const API_REPROCESS_BATCH='/api/internal/reprocess-inbound-batch';
 let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false,allReservations=[],resFiltered=[],reservationsLoaded=false,allGoogleReviews=[],googleFiltered=[],googleLoaded=false;
 const AVC=['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#f87171'];
 
@@ -1782,6 +1788,39 @@ async function logout(){
   clearAuthSession();
   resetDashboardState();
   showAuthScreen();
+}
+
+async function runReprocessEmails(){
+  const btn=document.getElementById('btnReprocess');
+  if(btn.classList.contains('loading'))return;
+  btn.classList.add('loading');
+  btn.style.opacity='0.6';
+  btn.style.pointerEvents='none';
+  try{
+    notify('⏳','Reseteando emails...');
+    const reset=await apiRequest(API_RESET_INBOUND,{method:'POST'});
+    if(!reset.ok)throw new Error(reset.error||'Error al resetear');
+    notify('🔄',`${reset.reset} emails listos. Reprocesando...`);
+    let totalMatched=0,totalIgnored=0,prevRemaining=Infinity,round=0;
+    while(true){
+      round++;
+      const r=await apiRequest(API_REPROCESS_BATCH,{method:'POST'});
+      if(!r.ok)break;
+      totalMatched+=r.matched||0;
+      totalIgnored+=r.ignored||0;
+      if(r.remaining===0)break;
+      if((r.matched||0)===0&&r.remaining>=prevRemaining)break;
+      prevRemaining=r.remaining;
+    }
+    notify('✅',`Listo: ${totalMatched} actualizadas, ${totalIgnored} ignoradas`);
+    await loadAll();
+  }catch(e){
+    notify('❌','Error: '+e.message);
+  }finally{
+    btn.classList.remove('loading');
+    btn.style.opacity='';
+    btn.style.pointerEvents='';
+  }
 }
 
 window.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeQrModal({target:{id:'qr-modal'}});});
