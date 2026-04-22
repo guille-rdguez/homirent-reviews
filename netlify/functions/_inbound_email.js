@@ -112,6 +112,8 @@ function inferConnector(explicitConnector, sourceAccount, channelGuess) {
 function classifyMessageType({ subject, rawText, rawHtml, channelGuess }) {
   const corpus = normalizeKey([subject, rawText, stripHtml(rawHtml)].filter(Boolean).join(' '));
   if (
+    corpus.includes('rated their stay') ||
+    corpus.includes('overall rating') ||
     corpus.includes('review') ||
     corpus.includes('resena') ||
     corpus.includes('reseña') ||
@@ -154,6 +156,14 @@ function classifyMessageType({ subject, rawText, rawHtml, channelGuess }) {
 }
 
 function extractRating(corpus) {
+  // Airbnb: "Jorge rated their stay 5 stars!" en subject o cuerpo
+  const airbnbStars = /rated\s+their\s+stay\s+([1-5])\s+stars?/i.exec(corpus);
+  if (airbnbStars?.[1]) return Number(airbnbStars[1]);
+
+  // Airbnb: "Overall rating 5" en cuerpo del email
+  const airbnbOverall = /overall\s+rating\s+([1-5])\b/i.exec(corpus);
+  if (airbnbOverall?.[1]) return Number(airbnbOverall[1]);
+
   // Expedia muestra la calificación con etiqueta (ej. "4.0 Muy bueno", "8.0 Excelente").
   // El email de partner usa escala 1-5; el portal al huésped la muestra como 1-10 (×2).
   // Si el valor extraído ya está en 1-5 lo usamos directo; si supera 5 lo convertimos.
@@ -194,6 +204,12 @@ const EMAIL_BOILERPLATE = [
   'aparece en los sitios de expedia',
   'take a minute to respond',
   'noreply@expedia',
+  // Airbnb boilerplate
+  'read on for a snapshot',
+  'both written reviews',
+  'we\'ve posted them to your airbnb',
+  'write a response',
+  'read full review',
 ];
 function isBoilerplate(text) {
   const lower = text.toLowerCase();
@@ -203,6 +219,13 @@ function isBoilerplate(text) {
 function extractReviewText(rawText, rawHtml) {
   const text = normalizeText(rawText || stripHtml(rawHtml));
   if (!text) return '';
+
+  // Airbnb: comentario después de "Overall rating X"
+  const airbnbComment = /overall\s+rating\s+[1-5][^\n]{0,30}\n+(.{10,1000}?)(?:\n\n|\n(?:Private\s+note|Read\s+full|Write\s+a)|$)/i.exec(text);
+  if (airbnbComment?.[1]) {
+    const comment = normalizeText(airbnbComment[1]);
+    if (comment.length >= 10 && !isBoilerplate(comment)) return comment;
+  }
 
   // Expedia: el comentario aparece entre la etiqueta de calificación y el nombre+fecha del huésped
   // Mínimo 5 chars en regex para no excluir comentarios cortos ("Muy buena zona" = 14 chars)
@@ -241,6 +264,8 @@ function parseInboundFields({ rawText, rawHtml, subject, headers }) {
   const corpus = `${text}\n${headerText}`;
 
   const guestName = extractFirstMatch(corpus, [
+    // Airbnb: "Jorge rated their stay 5 stars!"
+    /^([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ’’\-\s]{1,40})\s+rated\s+their\s+stay/im,
     /(?:guest|hu[eé]sped|traveler|traveller|usuario)\s*(?:name)?\s*[:\-]\s*([A-ZÁÉÍÓÚÑ][^\n<]{2,80})/i,
     /review from\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ’’.\-\s]{2,80})/i,
     /reseña de\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ’’.\-\s]{2,80})/i,
@@ -251,17 +276,25 @@ function parseInboundFields({ rawText, rawHtml, subject, headers }) {
     /([A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,})?)\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Ene|Feb|Mar|Abr|May|Jun|Jul|Ago|Sep|Oct|Nov|Dic)\s+\d{1,2}\b/,
   ]);
 
+  // Airbnb: property name in "Feedback from their stay" section
+  const airbnbProperty = extractFirstMatch(text, [
+    /feedback\s+from\s+their\s+stay\s+([^\n<]{5,120})/i,
+  ]);
+
   // Expedia/OTA: property name in greeting "Hola, {Property}:" or "Hello, {Property}:"
-  const propertyNameHint = extractFirstMatch(corpus, [
+  const propertyNameHint = airbnbProperty || extractFirstMatch(corpus, [
     /(?:Hola|Hello),\s+([^:,<\n]{3,120}):/i,
   ]);
 
-  // Expedia: URL del botón "Ver y responder" / "View and respond" en el HTML
+  // URL de review: Airbnb "Read full review" o Expedia "Ver y responder"
   const reviewUrl = (() => {
     if (!rawHtml) return '';
+    // Airbnb: botón "Read full review"
+    const ma = /href="(https:\/\/www\.airbnb\.[a-z.]{2,6}\/[^"]+)"[^>]*>[\s\S]{0,100}?Read\s+full\s+review/i.exec(rawHtml);
+    if (ma?.[1]) return ma[1];
+    // Expedia: botón "Ver y responder" / "View and respond"
     const m = /href="(https:\/\/link\.expediapartnercentral\.com\/[^"]+)"[^>]*>[\s\S]{0,200}?(?:Ver\s+y\s+responder|View\s+and\s+respond)/i.exec(rawHtml);
     if (m?.[1]) return m[1];
-    // fallback: primer link de expediapartnercentral que no sea imagen ni unsubscribe
     const m2 = /href="(https:\/\/link\.expediapartnercentral\.com\/c\/[^"]+)"/i.exec(rawHtml);
     return m2?.[1] || '';
   })();
