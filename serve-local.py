@@ -1897,12 +1897,6 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 "year": normalize_whitespace((query.get("year") or [""])[0]),
                 "month": normalize_whitespace((query.get("month") or [""])[0]),
             }
-            if not payload["propertyId"]:
-                self.send_json(
-                    HTTPStatus.BAD_REQUEST,
-                    {"ok": False, "error": "propertyId es obligatorio"},
-                )
-                return
             result = run_booking_local_action("data", payload)
         except ValueError as exc:
             self.send_json(

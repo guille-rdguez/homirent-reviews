@@ -951,12 +951,9 @@ body.auth-ready .auth-screen { display:none; }
     <div class="phdr" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
       <div>
         <div class="phead">Booking Reviews</div>
-        <div class="psub" id="booking-sub">Selecciona una propiedad para importar CSV y revisar analytics por mes.</div>
+        <div class="psub" id="booking-sub">Selecciona una propiedad antes de subir el CSV semanal y revisar analytics.</div>
       </div>
       <div class="fbar">
-        <select class="fsel" id="booking-prop" onchange="handleBookingFilterChange()">
-          <option value="">Selecciona un complejo</option>
-        </select>
         <select class="fsel" id="booking-year" onchange="handleBookingFilterChange()">
           <option value="">Todos los años</option>
         </select>
@@ -981,8 +978,29 @@ body.auth-ready .auth-screen { display:none; }
 
     <div class="card" style="margin-top:14px">
       <div class="ch">
-        <div class="ct">Centro de Carga CSV</div>
-        <div class="link-pill" id="booking-translate-pill">Traducción opcional</div>
+        <div>
+          <div class="ct">Hub por Propiedad</div>
+          <div class="psub" id="booking-overview-sub">Cargando propiedades de Booking...</div>
+        </div>
+      </div>
+      <div id="booking-properties-grid" class="g3">
+        <div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div>Cargando propiedades...</div>
+      </div>
+    </div>
+
+    <div class="card" id="booking-upload-anchor" style="margin-top:14px">
+      <div class="ch">
+        <div>
+          <div class="ct">Centro de Carga CSV</div>
+          <div class="psub" id="booking-upload-sub">Selecciona una propiedad arriba para empezar.</div>
+        </div>
+        <div class="fbar">
+          <select class="fsel" id="booking-prop" onchange="handleBookingFilterChange()">
+            <option value="">Selecciona un complejo</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" id="booking-open-comments-btn" onclick="openSelectedBookingComments()" disabled>Ver comentarios ↗</button>
+          <div class="link-pill" id="booking-translate-pill">Traducción opcional</div>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;align-items:start">
         <div style="display:flex;flex-direction:column;gap:12px">
@@ -1015,6 +1033,8 @@ body.auth-ready .auth-screen { display:none; }
         <div class="empty"><div class="ei">📄</div>Sube un CSV y usa “Analizar CSV” para revisar nuevas, duplicadas y errores antes de importar.</div>
       </div>
     </div>
+
+    <div id="booking-analytics-anchor"></div>
 
     <div class="stat-grid" style="margin-top:14px">
       <div class="scard g"><div class="slabel">Promedio Booking</div><div class="sval" id="booking-avg10" style="color:var(--green-acc)">—</div><div class="ssub">escala 1–10</div></div>
@@ -1177,7 +1197,7 @@ const API_BOOKING_IMPORT='/api/dashboard-booking-import';
 const API_RESET_INBOUND='/api/internal/reset-inbound-matched';
 const API_REPROCESS_BATCH='/api/internal/reprocess-inbound-batch';
 let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false,allReservations=[],resFiltered=[],reservationsLoaded=false,allGoogleReviews=[],googleFiltered=[],googleLoaded=false;
-let bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:''};
+let bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,overview:[],selectedProperty:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:'',overviewSetupRequired:false,overviewSetupMessage:''};
 const AVC=['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#f87171'];
 
 function readAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||'null');}catch(e){return null;}}
@@ -1234,7 +1254,7 @@ function resetDashboardState(){
   allGoogleReviews=[];
   googleFiltered=[];
   googleLoaded=false;
-  bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:''};
+  bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,overview:[],selectedProperty:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:'',overviewSetupRequired:false,overviewSetupMessage:''};
   deletingReviewIds=new Set();
   if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}
   if(document.getElementById('property-form'))resetPropertyForm();
@@ -1358,8 +1378,131 @@ function syncBookingYearFilter(years=[]){
   bookingState.availableYears=sorted;
   bookingState.year=sel.value;
 }
+function getBookingOverviewItem(propertyId=''){
+  return (bookingState.overview||[]).find(item=>item.propertyId===propertyId)||null;
+}
+function bookingHealth(item){
+  if(!item)return{label:'Sin seleccionar',color:'var(--text3)',border:'rgba(255,255,255,0.08)'};
+  if(!item.bookingUrl)return{label:'Link pendiente',color:'var(--amber)',border:'rgba(251,191,36,0.35)'};
+  if(!item.lastImportAt)return{label:'Sin cargas',color:'var(--text3)',border:'rgba(255,255,255,0.08)'};
+  const time=new Date(item.lastImportAt).getTime();
+  if(Number.isNaN(time))return{label:'Revisar',color:'var(--amber)',border:'rgba(251,191,36,0.35)'};
+  const days=Math.floor((Date.now()-time)/86400000);
+  if(days<=8)return{label:'Al día',color:'var(--green-acc)',border:'rgba(74,222,128,0.35)'};
+  if(days<=14)return{label:'Revisar',color:'var(--amber)',border:'rgba(251,191,36,0.35)'};
+  return{label:'Pendiente',color:'var(--red)',border:'rgba(248,113,113,0.35)'};
+}
+function bookingCityLabel(city=''){
+  return textOr(city,'').replace('Ciudad de México','CDMX');
+}
+function renderBookingOverview(){
+  const grid=document.getElementById('booking-properties-grid');
+  const sub=document.getElementById('booking-overview-sub');
+  if(!grid||!sub)return;
+  const overview=bookingState.overview||[];
+  if(!overview.length){
+    const msg=bookingState.overviewSetupRequired?bookingState.overviewSetupMessage:'No hay propiedades de Booking configuradas todavía.';
+    sub.textContent=msg;
+    grid.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="ei">🏨</div>${escapeHtml(msg)}</div>`;
+    return;
+  }
+  const linked=overview.filter(item=>item.bookingUrl).length;
+  sub.textContent=`${overview.length} propiedades · ${linked} con acceso directo a Booking`;
+  grid.innerHTML=overview.map(item=>{
+    const selected=item.propertyId===bookingState.propertyId;
+    const health=bookingHealth(item);
+    const lastWindow=item.lastReviewDateFrom&&item.lastReviewDateTo
+      ? `${formatShortDate(item.lastReviewDateFrom)} → ${formatShortDate(item.lastReviewDateTo)}`
+      : item.lastImportAt
+        ? `Última carga ${formatShortDate(item.lastImportAt)}`
+        : 'Sin cargas registradas';
+    return `<div class="card" style="padding:18px;border:1px solid ${selected?'rgba(96,165,250,0.45)':health.border};box-shadow:${selected?'0 0 0 1px rgba(96,165,250,0.25) inset':'none'}">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+        <div>
+          <div style="font-family:var(--font-head);font-size:20px;font-weight:700;color:var(--text);line-height:1.1">${escapeHtml(item.name||'Complejo sin nombre')}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px">${escapeHtml(bookingCityLabel(item.city))}</div>
+        </div>
+        <span style="font-size:11px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,0.06);color:${health.color};border:1px solid ${health.border};white-space:nowrap">${health.label}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px">
+        <div class="tag" style="justify-content:center;padding:8px 10px">${item.totalUploads||0} cargas</div>
+        <div class="tag" style="justify-content:center;padding:8px 10px">${item.totalRowsImported||0} reviews</div>
+        <div class="tag" style="justify-content:center;padding:8px 10px">${item.lastRowsNew||0} nuevas</div>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--text2);line-height:1.5">${escapeHtml(lastWindow)}</div>
+      <div style="margin-top:4px;font-size:11px;color:var(--text3)">${escapeHtml(item.lastFileName||'Aún no hay CSV cargado')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+        ${item.bookingUrl
+          ? `<a class="btn btn-primary btn-sm" href="${escapeHtml(item.bookingUrl)}" target="_blank" rel="noopener" style="text-decoration:none">Ver comentarios ↗</a>`
+          : '<button class="btn btn-ghost btn-sm" disabled>Link pendiente</button>'}
+        <button class="btn btn-ghost btn-sm" onclick="selectBookingProperty(${safeJsArg(item.propertyId)},'upload')">Subir CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="selectBookingProperty(${safeJsArg(item.propertyId)},'analytics')">Ver analytics</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function renderBookingWorkspaceChrome(){
+  const selected=getBookingOverviewItem(bookingState.propertyId);
+  const uploadSub=document.getElementById('booking-upload-sub');
+  const fileMeta=document.getElementById('booking-file-meta');
+  const fileInput=document.getElementById('booking-file');
+  const previewBtn=document.getElementById('booking-preview-btn');
+  const importBtn=document.getElementById('booking-import-btn');
+  const openCommentsBtn=document.getElementById('booking-open-comments-btn');
+  if(document.getElementById('booking-prop'))document.getElementById('booking-prop').value=bookingState.propertyId||'';
+  if(!selected){
+    if(uploadSub)uploadSub.textContent='Selecciona una propiedad arriba para empezar.';
+    if(fileMeta&&!bookingState.preview)fileMeta.textContent='Selecciona la propiedad correcta antes de cargar un CSV semanal de Booking.';
+    if(fileInput)fileInput.disabled=true;
+    if(previewBtn)previewBtn.disabled=true;
+    if(importBtn)importBtn.disabled=true;
+    if(openCommentsBtn){
+      openCommentsBtn.disabled=true;
+      openCommentsBtn.textContent='Ver comentarios ↗';
+    }
+    return;
+  }
+  if(uploadSub)uploadSub.textContent=`Propiedad seleccionada: ${selected.name} (${bookingCityLabel(selected.city)})`;
+  if(fileMeta&&!bookingState.preview){
+    fileMeta.textContent=`Propiedad: ${selected.name} · ${selected.bookingUrl?'Link de comentarios listo':'Falta configurar el link de comentarios'} · ${selected.lastImportAt?`Última carga: ${formatShortDate(selected.lastImportAt)}`:'Sin cargas previas'}`;
+  }
+  if(fileInput)fileInput.disabled=false;
+  if(previewBtn&&previewBtn.textContent==='Analizar CSV')previewBtn.disabled=false;
+  if(openCommentsBtn){
+    openCommentsBtn.disabled=!selected.bookingUrl;
+    openCommentsBtn.textContent=selected.bookingUrl?'Ver comentarios ↗':'Link pendiente';
+  }
+}
+function openBookingComments(propertyId=''){
+  const selected=getBookingOverviewItem(propertyId);
+  if(!selected?.bookingUrl){
+    notify('🔗','Esta propiedad aún no tiene un link de Booking configurado');
+    return;
+  }
+  window.open(selected.bookingUrl,'_blank','noopener');
+}
+function openSelectedBookingComments(){
+  openBookingComments(bookingState.propertyId);
+}
+async function selectBookingProperty(propertyId='',focus='upload'){
+  if(!propertyId)return;
+  const changed=bookingState.propertyId!==propertyId;
+  bookingState.propertyId=propertyId;
+  if(changed&&bookingState.preview&&bookingState.upload&&bookingState.upload.propertyId!==propertyId){
+    bookingState.preview=null;
+    bookingState.upload=null;
+    if(document.getElementById('booking-file'))document.getElementById('booking-file').value='';
+    renderBookingPreview();
+  }
+  await loadBookingDashboard();
+  const target=document.getElementById(focus==='analytics'?'booking-analytics-anchor':'booking-upload-anchor');
+  if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
+}
 function renderBookingLoading(){
   document.getElementById('booking-sub').textContent='Cargando datos de Booking...';
+  document.getElementById('booking-overview-sub').textContent='Cargando propiedades de Booking...';
+  document.getElementById('booking-properties-grid').innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div>Cargando propiedades...</div>';
+  document.getElementById('booking-upload-sub').textContent='Preparando centro de carga...';
   document.getElementById('booking-monthly').innerHTML='<div class="empty"><div class="ei">⏳</div>Cargando...</div>';
   document.getElementById('booking-batches').innerHTML='<div class="empty"><div class="ei">⏳</div>Cargando...</div>';
   document.getElementById('booking-areas').innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ei">⏳</div>Cargando...</div>';
@@ -1384,7 +1527,7 @@ function renderBookingPreview(){
     translateValue.textContent='—';
     translateSub.textContent='Configura la API key para traducir a español';
     if(translatePill)translatePill.textContent='Traducción opcional';
-    document.getElementById('booking-file-meta').textContent='Acepta solo archivos `.csv` de Booking. La respuesta directa en Booking la dejamos para una siguiente fase.';
+    renderBookingWorkspaceChrome();
     return;
   }
   const s=preview.summary||{};
@@ -1404,8 +1547,10 @@ function renderBookingPreview(){
   document.getElementById('booking-file-meta').textContent=`Propiedad: ${s.property?.name||'—'} · ${s.monthsDetected?.length?`Meses detectados: ${s.monthsDetected.map(formatMonthKey).join(', ')}`:'Sin meses detectados'}`;
   panel.innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">${chips.map(chip=>`<div class="scard" style="min-height:unset;padding:14px"><div class="slabel">${chip.label}</div><div class="sval" style="color:${chip.color}">${chip.value}</div></div>`).join('')}</div>
   <div style="overflow-x:auto"><table class="rtable"><thead><tr><th>Fila</th><th>Estado</th><th>Fecha</th><th>Huésped</th><th>Reserva</th><th>General</th><th>Comentario</th></tr></thead><tbody>${(preview.sampleRows||[]).map(row=>`<tr><td>${row.rowNumber}</td><td><span style="font-size:11px;padding:3px 8px;border-radius:20px;background:rgba(255,255,255,0.07);color:${row.status==='parsed'?'var(--green-acc)':row.status==='invalid'?'var(--red)':'var(--amber)'}">${escapeHtml(bookingStatusLabel(row.status))}</span>${row.issues?.length?`<div style="font-size:10px;color:var(--text3);margin-top:4px">${escapeHtml(row.issues.join(', '))}</div>`:''}</td><td>${safeText(row.reviewDateIso?formatShortDate(row.reviewDateIso):'—')}</td><td>${safeText(row.guestName)}</td><td>${safeText(row.reservationNumber)}</td><td><span style="color:${scoreBadgeColor(row.ratingOverall10)};font-weight:700">${row.ratingOverall10??'—'}</span> <span style="font-size:11px;color:var(--text3)">/ ${row.ratingGeneral5??'—'}★</span></td><td style="max-width:360px;white-space:normal;word-break:break-word;color:var(--text2)">${safeText(row.combinedComment||row.negativeReview||row.positiveReview,'—')}</td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text3)">Sin filas para mostrar</td></tr>'}</tbody></table></div>`;
+  renderBookingWorkspaceChrome();
 }
 function renderBookingDashboardData(){
+  renderBookingOverview();
   const summary=bookingState.summary;
   const monthly=bookingState.monthly||[];
   const areaSummary=bookingState.areaSummary||[];
@@ -1413,10 +1558,10 @@ function renderBookingDashboardData(){
   const batches=bookingState.importBatches||[];
   const setupRequired=Boolean(bookingState.setupRequired);
   const setupMessage=bookingState.setupMessage||'';
-  const prop=propMap[bookingState.propertyId]||allProps.find(item=>item.id===bookingState.propertyId)||null;
+  const prop=bookingState.selectedProperty||getBookingOverviewItem(bookingState.propertyId)||propMap[bookingState.propertyId]||allProps.find(item=>item.id===bookingState.propertyId)||null;
   document.getElementById('booking-sub').textContent=setupRequired
     ? setupMessage
-    : prop?`${prop.name} · ${bookingState.year||'Todos los años'}${bookingState.month?` · ${formatMonthKey(`2000-${bookingState.month}`)}`:''}`:'Selecciona una propiedad para importar CSV y revisar analytics por mes.';
+    : prop?`${prop.name} · ${bookingState.year||'Todos los años'}${bookingState.month?` · ${formatMonthKey(`2000-${bookingState.month}`)}`:''}`:'Selecciona una propiedad del hub para subir su CSV y revisar analytics.';
   document.getElementById('booking-avg10').textContent=summary?.avgOverall10!=null?summary.avgOverall10.toFixed(2):'—';
   document.getElementById('booking-avg5').textContent=summary?.avgGeneral5!=null?summary.avgGeneral5.toFixed(2):'—';
   document.getElementById('booking-translated').textContent=summary?.translatedReviews!=null?String(summary.translatedReviews):'—';
@@ -1433,36 +1578,28 @@ function renderBookingDashboardData(){
   const recentEl=document.getElementById('booking-recent');
   if(!recent.length)recentEl.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text3)">${escapeHtml(setupRequired?setupMessage:'Sin reviews para este filtro')}</td></tr>`;
   else recentEl.innerHTML=recent.map(row=>`<tr><td style="white-space:nowrap">${escapeHtml(formatShortDate(row.review_date))}</td><td style="font-weight:600;color:var(--text)">${safeText(row.guest_name)}</td><td>${safeText(row.reservation_number)}</td><td><span style="color:${scoreBadgeColor(row.rating_overall_10)};font-weight:700">${textOr(row.rating_overall_10,'—')}</span><div style="font-size:10px;color:var(--text3)">${textOr(row.rating_general_5,'—')}★ general</div></td><td>${textOr(row.score_staff,'—')}</td><td>${textOr(row.score_cleanliness,'—')}</td><td style="max-width:420px;min-width:220px"><div style="font-size:12px;color:var(--text2);white-space:normal;word-break:break-word;line-height:1.5">${safeText(row.translated_combined_comment||row.combined_comment,'—')}</div>${row.translation_status==='translated'?'<div style="font-size:10px;color:var(--green-acc);margin-top:6px">Traducida a español</div>':''}</td></tr>`).join('');
+  renderBookingWorkspaceChrome();
 }
 async function loadBookingDashboard(){
   if(!authReady)return;
   const propSel=document.getElementById('booking-prop');
   if(!propSel)return;
-  if(!propSel.value&&allProps.length)buildBookingPropFilter();
-  const propertyId=propSel.value||bookingState.propertyId||allProps[0]?.id||'';
-  if(!propertyId){
-    bookingState.loaded=false;
-    bookingState.summary=null;
-    bookingState.monthly=[];
-    bookingState.areaSummary=[];
-    bookingState.recentReviews=[];
-    bookingState.importBatches=[];
-    bookingState.setupRequired=false;
-    bookingState.setupMessage='';
-    renderBookingDashboardData();
-    return;
-  }
+  if(allProps.length)buildBookingPropFilter();
+  const propertyId=propSel.value||bookingState.propertyId||'';
   bookingState.propertyId=propertyId;
   bookingState.year=document.getElementById('booking-year')?.value||'';
   bookingState.month=document.getElementById('booking-month')?.value||'';
   bookingState.loading=true;
   renderBookingLoading();
   try{
-    const params=new URLSearchParams({propertyId:bookingState.propertyId});
+    const params=new URLSearchParams();
+    if(bookingState.propertyId)params.set('propertyId',bookingState.propertyId);
     if(bookingState.year)params.set('year',bookingState.year);
     if(bookingState.month)params.set('month',bookingState.month);
     const data=await apiRequest(`${API_BOOKING_DATA}?${params.toString()}`,{method:'GET'});
     bookingState.loaded=true;
+    bookingState.overview=data.overview||[];
+    bookingState.selectedProperty=data.selectedProperty||getBookingOverviewItem(bookingState.propertyId)||null;
     bookingState.summary=data.summary||null;
     bookingState.monthly=data.monthly||[];
     bookingState.areaSummary=data.areaSummary||[];
@@ -1471,17 +1608,23 @@ async function loadBookingDashboard(){
     bookingState.availableYears=data.filters?.availableYears||[];
     bookingState.setupRequired=Boolean(data.setupRequired);
     bookingState.setupMessage=data.setupMessage||'';
+    bookingState.overviewSetupRequired=Boolean(data.overviewSetupRequired);
+    bookingState.overviewSetupMessage=data.overviewSetupMessage||'';
     syncBookingYearFilter(bookingState.availableYears);
     if(document.getElementById('booking-month'))document.getElementById('booking-month').value=bookingState.month||'';
     if(document.getElementById('booking-prop'))document.getElementById('booking-prop').value=bookingState.propertyId;
     renderBookingDashboardData();
   }catch(e){
     console.error(e);
+    bookingState.overview=[];
     document.getElementById('booking-sub').textContent='Error al cargar Booking';
+    document.getElementById('booking-overview-sub').textContent='No se pudo cargar Booking';
+    document.getElementById('booking-properties-grid').innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="ei">❌</div>${escapeHtml(e.message)}</div>`;
     document.getElementById('booking-monthly').innerHTML=`<div class="empty"><div class="ei">❌</div>${escapeHtml(e.message)}</div>`;
     document.getElementById('booking-batches').innerHTML='<div class="empty"><div class="ei">🧾</div>Sin datos</div>';
     document.getElementById('booking-areas').innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ei">📊</div>Sin datos</div>';
     document.getElementById('booking-recent').innerHTML='<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--red)">Error al cargar</td></tr>';
+    renderBookingWorkspaceChrome();
   }finally{
     bookingState.loading=false;
   }
@@ -1489,6 +1632,7 @@ async function loadBookingDashboard(){
 function handleBookingFilterChange(){
   const propId=document.getElementById('booking-prop')?.value||'';
   bookingState.propertyId=propId;
+  bookingState.selectedProperty=getBookingOverviewItem(propId)||null;
   bookingState.year=document.getElementById('booking-year')?.value||'';
   bookingState.month=document.getElementById('booking-month')?.value||'';
   if(bookingState.preview&&bookingState.upload&&bookingState.upload.propertyId!==propId){
@@ -1505,7 +1649,7 @@ function refreshBookingDashboard(){
   notify('↻','Dashboard de Booking actualizado');
 }
 async function previewBookingCsv(){
-  const propertyId=document.getElementById('booking-prop')?.value||allProps[0]?.id||'';
+  const propertyId=document.getElementById('booking-prop')?.value||bookingState.propertyId||'';
   const input=document.getElementById('booking-file');
   const btn=document.getElementById('booking-preview-btn');
   if(!propertyId){notify('⚠️','Selecciona un complejo antes de analizar el CSV');return;}

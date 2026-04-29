@@ -12,6 +12,25 @@ const BOOKING_SOURCE_TYPE = 'booking_csv';
 const BOOKING_SETUP_MIGRATION = '20260428_booking_csv_ingestion.sql';
 const GOOGLE_TRANSLATE_ENDPOINT = 'https://translation.googleapis.com/language/translate/v2';
 const MAX_TRANSLATE_BATCH_SIZE = 64;
+const BOOKING_REVIEW_LINKS = [
+  { city: 'Querétaro', name: 'El Doce', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=8713914&lang=es' },
+  { city: 'Querétaro', name: 'Morelos', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=9262488&lang=es' },
+  { city: 'Querétaro', name: 'Hacienda Santa Bárbara', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=10892046&lang=es' },
+  { city: 'Querétaro', name: 'Musgo', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=12038573&lang=es' },
+  { city: 'Querétaro', name: 'Universidad', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=12815077&lang=es' },
+  { city: 'Querétaro', name: 'Liquidambar', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=14079638&lang=es' },
+  { city: 'Querétaro', name: 'Allende', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=13808497&lang=es' },
+  { city: 'Querétaro', name: 'Damian Carmona', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=15636879&lang=es' },
+  { city: 'Querétaro', name: 'Suites Álamos', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=14786823&lang=es' },
+  { city: 'Querétaro', name: 'Ezequiel Montes', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=14716326&lang=es' },
+  { city: 'Querétaro', name: 'Primavera', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=14546697&lang=es' },
+  { city: 'Querétaro', name: 'Pájaros', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=14537888&lang=es' },
+  { city: 'Querétaro', name: 'Wenceslao', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=14405576&lang=es' },
+  { city: 'Ciudad de México', name: 'Balsas', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=8963209&lang=es' },
+  { city: 'Ciudad de México', name: 'Prosperidad', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=8970236&lang=es' },
+  { city: 'Ciudad de México', name: 'Lago Zirahuén', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=9276359&lang=es' },
+  { city: 'Mérida', name: 'Suites Reforma', url: 'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/reviews.html?hotel_id=9537971&lang=es' },
+];
 
 const BOOKING_HEADERS = {
   review_date: [
@@ -97,6 +116,21 @@ const AREA_DETAILS = [
   { key: 'score_comfort', label: 'Comfort' },
   { key: 'score_value_for_money', label: 'Value for money' },
 ];
+
+const BOOKING_REVIEW_LINK_MAP = new Map(
+  BOOKING_REVIEW_LINKS.map((item) => [
+    `${normalizeDirectoryKey(item.city)}::${normalizeDirectoryKey(item.name)}`,
+    item.url,
+  ])
+);
+
+function normalizeDirectoryKey(value) {
+  return String(value || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
 
 function detectMissingBookingTableName(message = '') {
   const input = String(message || '');
@@ -360,12 +394,36 @@ function monthKeyFromIso(value) {
   return String(value || '').slice(0, 7);
 }
 
+function fallbackBookingReviewUrl(property = {}) {
+  const cityKey = normalizeDirectoryKey(property?.city);
+  const nameKey = normalizeDirectoryKey(property?.name);
+  if (!cityKey || !nameKey) return '';
+  return BOOKING_REVIEW_LINK_MAP.get(`${cityKey}::${nameKey}`) || '';
+}
+
 function chunk(items, size = 100) {
   const batches = [];
   for (let index = 0; index < items.length; index += size) {
     batches.push(items.slice(index, index + size));
   }
   return batches;
+}
+
+async function listActiveProperties() {
+  const { url } = getSupabaseConfig();
+  const headers = createSupabaseHeaders();
+  const params = new URLSearchParams({
+    select: 'id,name,city',
+    active: 'eq.true',
+    order: 'city,name',
+  });
+  const res = await fetch(`${url}/rest/v1/properties?${params.toString()}`, { headers });
+  if (!res.ok) {
+    const details = await readErrorText(res);
+    throw new Error(details || `Supabase devolvio ${res.status} al leer properties`);
+  }
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows : [];
 }
 
 async function getPropertyById(propertyId) {
@@ -383,6 +441,116 @@ async function getPropertyById(propertyId) {
   }
   const rows = await res.json();
   return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function listBookingListings() {
+  const { url } = getSupabaseConfig();
+  const headers = createSupabaseHeaders();
+  const params = new URLSearchParams({
+    select: 'id,property_id,display_name,listing_url,external_listing_id,metadata',
+    connector: 'eq.booking',
+    active: 'eq.true',
+    order: 'created_at.desc',
+    limit: '500',
+  });
+  const res = await fetch(`${url}/rest/v1/external_listings?${params.toString()}`, { headers });
+  if (!res.ok) {
+    const details = await readErrorText(res);
+    throw new Error(details || `Supabase devolvio ${res.status} al leer external_listings de Booking`);
+  }
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function listBookingImportBatchesOverview() {
+  const { url } = getSupabaseConfig();
+  const headers = createSupabaseHeaders();
+  const params = new URLSearchParams({
+    select:
+      'id,property_id,source_filename,rows_detected,rows_new,rows_duplicate_existing,rows_duplicate_in_file,rows_invalid,rows_translated,review_date_from,review_date_to,status,created_at',
+    order: 'created_at.desc',
+    limit: '5000',
+  });
+  const res = await fetch(`${url}/rest/v1/booking_import_batches?${params.toString()}`, { headers });
+  if (!res.ok) {
+    const details = await readErrorText(res);
+    if (isMissingBookingTableError(details)) {
+      return {
+        rows: [],
+        setupRequired: true,
+        setupMessage: bookingSetupMessage(
+          'mostrar el historial operativo de Booking',
+          detectMissingBookingTableName(details) || 'booking_import_batches'
+        ),
+      };
+    }
+    throw new Error(details || `Supabase devolvio ${res.status} al leer booking_import_batches`);
+  }
+  const rows = await res.json();
+  return {
+    rows: Array.isArray(rows) ? rows : [],
+    setupRequired: false,
+    setupMessage: '',
+  };
+}
+
+function buildBookingOverview(properties = [], listings = [], importBatches = []) {
+  const listingMap = new Map();
+  listings.forEach((listing) => {
+    const propertyId = normalizeText(listing?.property_id);
+    if (!propertyId || listingMap.has(propertyId)) return;
+    listingMap.set(propertyId, listing);
+  });
+
+  const batchesMap = new Map();
+  importBatches.forEach((batch) => {
+    const propertyId = normalizeText(batch?.property_id);
+    if (!propertyId) return;
+    if (!batchesMap.has(propertyId)) batchesMap.set(propertyId, []);
+    batchesMap.get(propertyId).push(batch);
+  });
+
+  return properties.map((property) => {
+    const propertyId = normalizeText(property?.id);
+    const listing = listingMap.get(propertyId) || null;
+    const batches = (batchesMap.get(propertyId) || []).slice().sort((left, right) =>
+      String(right?.created_at || '').localeCompare(String(left?.created_at || ''))
+    );
+    const lastBatch = batches[0] || null;
+    const totalRowsImported = batches.reduce(
+      (sum, batch) => sum + (Number(batch?.rows_new) || 0),
+      0
+    );
+    const bookingUrl =
+      normalizeText(listing?.listing_url) ||
+      normalizeText(listing?.metadata?.bookingReviewUrl) ||
+      fallbackBookingReviewUrl(property);
+
+    return {
+      propertyId,
+      name: property?.name || '',
+      city: property?.city || '',
+      bookingUrl,
+      listingLabel:
+        normalizeText(listing?.display_name) ||
+        normalizeText(listing?.external_listing_id) ||
+        (bookingUrl ? 'Booking reviews' : '') ||
+        '',
+      totalUploads: batches.length,
+      totalRowsImported,
+      lastImportAt: lastBatch?.created_at || null,
+      lastFileName: lastBatch?.source_filename || null,
+      lastRowsDetected: Number(lastBatch?.rows_detected) || 0,
+      lastRowsNew: Number(lastBatch?.rows_new) || 0,
+      lastRowsInvalid: Number(lastBatch?.rows_invalid) || 0,
+      lastRowsDuplicates:
+        (Number(lastBatch?.rows_duplicate_existing) || 0) +
+        (Number(lastBatch?.rows_duplicate_in_file) || 0),
+      lastReviewDateFrom: lastBatch?.review_date_from || null,
+      lastReviewDateTo: lastBatch?.review_date_to || null,
+      lastStatus: normalizeText(lastBatch?.status) || '',
+    };
+  });
 }
 
 async function listExistingBookingKeys(propertyId, bookingKeys = [], externalIds = []) {
@@ -1058,6 +1226,38 @@ function aggregateBookingRows(rows = []) {
 }
 
 async function loadBookingDashboard({ propertyId, year, month }) {
+  const [properties, listings, importOverview] = await Promise.all([
+    listActiveProperties(),
+    listBookingListings(),
+    listBookingImportBatchesOverview(),
+  ]);
+  const overview = buildBookingOverview(properties, listings, importOverview.rows);
+  const emptyAnalytics = aggregateBookingRows([]);
+  const selectedOverview =
+    overview.find((item) => item.propertyId === normalizeText(propertyId)) || null;
+
+  if (!propertyId) {
+    return {
+      overview,
+      overviewSetupRequired: importOverview.setupRequired,
+      overviewSetupMessage: importOverview.setupMessage,
+      selectedPropertyId: '',
+      selectedProperty: null,
+      filters: {
+        availableYears: [],
+        selectedYear: year || '',
+        selectedMonth: month || '',
+      },
+      summary: emptyAnalytics.summary,
+      monthly: emptyAnalytics.monthly,
+      areaSummary: [],
+      recentReviews: [],
+      importBatches: [],
+      setupRequired: false,
+      setupMessage: '',
+    };
+  }
+
   const property = await getPropertyById(propertyId);
   if (!property) throw new Error('Propiedad invalida o inactiva');
 
@@ -1091,8 +1291,29 @@ async function loadBookingDashboard({ propertyId, year, month }) {
       .filter(Boolean)
       .join(' | ');
     if (isMissingBookingTableError(details)) {
-      const emptyAnalytics = aggregateBookingRows([]);
       return {
+        overview,
+        overviewSetupRequired: importOverview.setupRequired,
+        overviewSetupMessage: importOverview.setupMessage,
+        selectedPropertyId: propertyId,
+        selectedProperty: selectedOverview || {
+          propertyId: property.id,
+          name: property.name,
+          city: property.city,
+          bookingUrl: '',
+          listingLabel: '',
+          totalUploads: 0,
+          totalRowsImported: 0,
+          lastImportAt: null,
+          lastFileName: null,
+          lastRowsDetected: 0,
+          lastRowsNew: 0,
+          lastRowsInvalid: 0,
+          lastRowsDuplicates: 0,
+          lastReviewDateFrom: null,
+          lastReviewDateTo: null,
+          lastStatus: '',
+        },
         property,
         setupRequired: true,
         setupMessage: bookingSetupMessage(
@@ -1127,6 +1348,29 @@ async function loadBookingDashboard({ propertyId, year, month }) {
 
   const analytics = aggregateBookingRows(filteredRows);
   return {
+    overview,
+    overviewSetupRequired: importOverview.setupRequired,
+    overviewSetupMessage: importOverview.setupMessage,
+    selectedPropertyId: propertyId,
+    selectedProperty:
+      selectedOverview || {
+        propertyId: property.id,
+        name: property.name,
+        city: property.city,
+        bookingUrl: '',
+        listingLabel: '',
+        totalUploads: 0,
+        totalRowsImported: 0,
+        lastImportAt: null,
+        lastFileName: null,
+        lastRowsDetected: 0,
+        lastRowsNew: 0,
+        lastRowsInvalid: 0,
+        lastRowsDuplicates: 0,
+        lastReviewDateFrom: null,
+        lastReviewDateTo: null,
+        lastStatus: '',
+      },
     property,
     filters: {
       availableYears,
@@ -1138,6 +1382,8 @@ async function loadBookingDashboard({ propertyId, year, month }) {
     areaSummary: analytics.areaSummary,
     recentReviews: filteredRows.slice(0, 25),
     importBatches: Array.isArray(importBatches) ? importBatches : [],
+    setupRequired: false,
+    setupMessage: '',
   };
 }
 

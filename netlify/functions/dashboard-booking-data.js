@@ -12,8 +12,6 @@ exports.handler = async (event) => {
   const year = String(params.get('year') || '').trim();
   const month = String(params.get('month') || '').trim();
 
-  if (!propertyId) return serverError('propertyId es obligatorio', 400);
-
   try {
     const result = await loadBookingDashboard({ propertyId, year, month });
     return json(200, { ok: true, ...result });
