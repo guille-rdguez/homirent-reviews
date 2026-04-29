@@ -1177,7 +1177,7 @@ const API_BOOKING_IMPORT='/api/dashboard-booking-import';
 const API_RESET_INBOUND='/api/internal/reset-inbound-matched';
 const API_REPROCESS_BATCH='/api/internal/reprocess-inbound-batch';
 let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false,allReservations=[],resFiltered=[],reservationsLoaded=false,allGoogleReviews=[],googleFiltered=[],googleLoaded=false;
-let bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[]};
+let bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:''};
 const AVC=['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#f87171'];
 
 function readAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||'null');}catch(e){return null;}}
@@ -1234,7 +1234,7 @@ function resetDashboardState(){
   allGoogleReviews=[];
   googleFiltered=[];
   googleLoaded=false;
-  bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[]};
+  bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:''};
   deletingReviewIds=new Set();
   if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}
   if(document.getElementById('property-form'))resetPropertyForm();
@@ -1411,23 +1411,27 @@ function renderBookingDashboardData(){
   const areaSummary=bookingState.areaSummary||[];
   const recent=bookingState.recentReviews||[];
   const batches=bookingState.importBatches||[];
+  const setupRequired=Boolean(bookingState.setupRequired);
+  const setupMessage=bookingState.setupMessage||'';
   const prop=propMap[bookingState.propertyId]||allProps.find(item=>item.id===bookingState.propertyId)||null;
-  document.getElementById('booking-sub').textContent=prop?`${prop.name} · ${bookingState.year||'Todos los años'}${bookingState.month?` · ${formatMonthKey(`2000-${bookingState.month}`)}`:''}`:'Selecciona una propiedad para importar CSV y revisar analytics por mes.';
+  document.getElementById('booking-sub').textContent=setupRequired
+    ? setupMessage
+    : prop?`${prop.name} · ${bookingState.year||'Todos los años'}${bookingState.month?` · ${formatMonthKey(`2000-${bookingState.month}`)}`:''}`:'Selecciona una propiedad para importar CSV y revisar analytics por mes.';
   document.getElementById('booking-avg10').textContent=summary?.avgOverall10!=null?summary.avgOverall10.toFixed(2):'—';
   document.getElementById('booking-avg5').textContent=summary?.avgGeneral5!=null?summary.avgGeneral5.toFixed(2):'—';
   document.getElementById('booking-translated').textContent=summary?.translatedReviews!=null?String(summary.translatedReviews):'—';
   document.getElementById('booking-total').textContent=summary?.totalReviews!=null?String(summary.totalReviews):'—';
   const monthlyEl=document.getElementById('booking-monthly');
-  if(!monthly.length)monthlyEl.innerHTML='<div class="empty"><div class="ei">📈</div>Sin datos para este filtro</div>';
+  if(!monthly.length)monthlyEl.innerHTML=`<div class="empty"><div class="ei">📈</div>${escapeHtml(setupRequired?setupMessage:'Sin datos para este filtro')}</div>`;
   else monthlyEl.innerHTML=`<div style="overflow-x:auto"><table class="rtable"><thead><tr><th>Mes</th><th>Reviews</th><th>Prom. 10</th><th>Prom. 5</th><th>Staff</th><th>Limpieza</th><th>Ubicación</th></tr></thead><tbody>${[...monthly].sort((a,b)=>b.month.localeCompare(a.month)).map(row=>`<tr><td>${escapeHtml(formatMonthKey(row.month))}</td><td>${row.count}</td><td><span style="color:${scoreBadgeColor(row.avgOverall10)};font-weight:700">${row.avgOverall10?.toFixed(2)||'—'}</span></td><td>${row.avgGeneral5?.toFixed(2)||'—'}★</td><td>${row.avgStaff?.toFixed(2)||'—'}</td><td>${row.avgCleanliness?.toFixed(2)||'—'}</td><td>${row.avgLocation?.toFixed(2)||'—'}</td></tr>`).join('')}</tbody></table></div>`;
   const batchesEl=document.getElementById('booking-batches');
-  if(!batches.length)batchesEl.innerHTML='<div class="empty"><div class="ei">🧾</div>Sin importaciones todavía</div>';
+  if(!batches.length)batchesEl.innerHTML=`<div class="empty"><div class="ei">🧾</div>${escapeHtml(setupRequired?setupMessage:'Sin importaciones todavía')}</div>`;
   else batchesEl.innerHTML=batches.map(batch=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)"><div style="min-width:0"><div style="font-size:13px;font-weight:600;color:var(--text)">${safeText(batch.source_filename||'booking.csv')}</div><div style="font-size:11px;color:var(--text3)">${safeText(formatShortDate(batch.created_at))} · ${safeText(batch.uploaded_by||'dashboard')}</div></div><div style="text-align:right;font-size:11px;color:var(--text2)"><div><span style="color:var(--green-acc)">${batch.rows_new||0}</span> nuevas</div><div><span style="color:var(--amber)">${(batch.rows_duplicate_existing||0)+(batch.rows_duplicate_in_file||0)}</span> duplicadas</div><div><span style="color:var(--red)">${batch.rows_invalid||0}</span> inválidas</div></div></div>`).join('');
   const areasEl=document.getElementById('booking-areas');
-  if(!areaSummary.length)areasEl.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ei">📊</div>Sin datos</div>';
+  if(!areaSummary.length)areasEl.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="ei">📊</div>${escapeHtml(setupRequired?setupMessage:'Sin datos')}</div>`;
   else areasEl.innerHTML=areaSummary.map(area=>`<div class="card" style="border-top:3px solid ${scoreBadgeColor(area.average)}"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">${escapeHtml(area.label)}</div><div style="font-family:var(--font-head);font-size:30px;font-weight:700;color:${scoreBadgeColor(area.average)};line-height:1">${area.average!=null?area.average.toFixed(2):'—'}</div><div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${(area.distribution||[]).map(item=>`<span class="tag">${item.score}: ${item.count}</span>`).join('')||'<span class="tag">Sin datos</span>'}</div></div>`).join('');
   const recentEl=document.getElementById('booking-recent');
-  if(!recent.length)recentEl.innerHTML='<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text3)">Sin reviews para este filtro</td></tr>';
+  if(!recent.length)recentEl.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text3)">${escapeHtml(setupRequired?setupMessage:'Sin reviews para este filtro')}</td></tr>`;
   else recentEl.innerHTML=recent.map(row=>`<tr><td style="white-space:nowrap">${escapeHtml(formatShortDate(row.review_date))}</td><td style="font-weight:600;color:var(--text)">${safeText(row.guest_name)}</td><td>${safeText(row.reservation_number)}</td><td><span style="color:${scoreBadgeColor(row.rating_overall_10)};font-weight:700">${textOr(row.rating_overall_10,'—')}</span><div style="font-size:10px;color:var(--text3)">${textOr(row.rating_general_5,'—')}★ general</div></td><td>${textOr(row.score_staff,'—')}</td><td>${textOr(row.score_cleanliness,'—')}</td><td style="max-width:420px;min-width:220px"><div style="font-size:12px;color:var(--text2);white-space:normal;word-break:break-word;line-height:1.5">${safeText(row.translated_combined_comment||row.combined_comment,'—')}</div>${row.translation_status==='translated'?'<div style="font-size:10px;color:var(--green-acc);margin-top:6px">Traducida a español</div>':''}</td></tr>`).join('');
 }
 async function loadBookingDashboard(){
@@ -1443,6 +1447,8 @@ async function loadBookingDashboard(){
     bookingState.areaSummary=[];
     bookingState.recentReviews=[];
     bookingState.importBatches=[];
+    bookingState.setupRequired=false;
+    bookingState.setupMessage='';
     renderBookingDashboardData();
     return;
   }
@@ -1463,6 +1469,8 @@ async function loadBookingDashboard(){
     bookingState.recentReviews=data.recentReviews||[];
     bookingState.importBatches=data.importBatches||[];
     bookingState.availableYears=data.filters?.availableYears||[];
+    bookingState.setupRequired=Boolean(data.setupRequired);
+    bookingState.setupMessage=data.setupMessage||'';
     syncBookingYearFilter(bookingState.availableYears);
     if(document.getElementById('booking-month'))document.getElementById('booking-month').value=bookingState.month||'';
     if(document.getElementById('booking-prop'))document.getElementById('booking-prop').value=bookingState.propertyId;

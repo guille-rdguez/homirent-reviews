@@ -9,6 +9,7 @@ const {
 const BOOKING_CONNECTOR = 'booking';
 const BOOKING_CHANNEL = 'booking';
 const BOOKING_SOURCE_TYPE = 'booking_csv';
+const BOOKING_SETUP_MIGRATION = '20260428_booking_csv_ingestion.sql';
 const GOOGLE_TRANSLATE_ENDPOINT = 'https://translation.googleapis.com/language/translate/v2';
 const MAX_TRANSLATE_BATCH_SIZE = 64;
 
@@ -96,6 +97,34 @@ const AREA_DETAILS = [
   { key: 'score_comfort', label: 'Comfort' },
   { key: 'score_value_for_money', label: 'Value for money' },
 ];
+
+function detectMissingBookingTableName(message = '') {
+  const input = String(message || '');
+  return ['booking_review_details', 'booking_import_batches'].find(
+    (tableName) => input.includes(`public.${tableName}`) || input.includes(tableName)
+  ) || null;
+}
+
+function isMissingBookingTableError(message = '') {
+  const input = String(message || '');
+  return Boolean(
+    detectMissingBookingTableName(input) &&
+      /PGRST205|schema cache|Could not find the table/i.test(input)
+  );
+}
+
+function bookingSetupMessage(action = 'usar Booking', tableName = 'booking_review_details') {
+  return `Booking necesita la migración de Supabase ${BOOKING_SETUP_MIGRATION} antes de ${action}. Falta la tabla public.${tableName}.`;
+}
+
+function toBookingSetupError(error, action = 'usar Booking') {
+  const message = String(error?.message || error || '');
+  if (!isMissingBookingTableError(message)) {
+    return error instanceof Error ? error : new Error(message || 'Error desconocido de Booking');
+  }
+  const tableName = detectMissingBookingTableName(message) || 'booking_review_details';
+  return new Error(bookingSetupMessage(action, tableName));
+}
 
 function normalizeText(value) {
   return String(value || '')
@@ -362,46 +391,24 @@ async function listExistingBookingKeys(propertyId, bookingKeys = [], externalIds
   const existingKeys = new Set();
   const existingExternalIds = new Set();
 
-  const [detailsRes, reviewsRes] = await Promise.all([
-    fetch(
-      `${url}/rest/v1/booking_review_details?${new URLSearchParams({
-        select: 'booking_review_key',
-        property_id: `eq.${propertyId}`,
-        limit: '5000',
-      }).toString()}`,
-      { headers }
-    ),
-    fetch(
-      `${url}/rest/v1/reviews?${new URLSearchParams({
-        select: 'external_review_id',
-        connector: `eq.${BOOKING_CONNECTOR}`,
-        property_id: `eq.${propertyId}`,
-        limit: '5000',
-      }).toString()}`,
-      { headers }
-    ),
-  ]);
+  const reviewsRes = await fetch(
+    `${url}/rest/v1/reviews?${new URLSearchParams({
+      select: 'external_review_id',
+      connector: `eq.${BOOKING_CONNECTOR}`,
+      property_id: `eq.${propertyId}`,
+      limit: '5000',
+    }).toString()}`,
+    { headers }
+  );
 
-  if (!detailsRes.ok || !reviewsRes.ok) {
-    const details = [
-      !detailsRes.ok ? await readErrorText(detailsRes) : '',
-      !reviewsRes.ok ? await readErrorText(reviewsRes) : '',
-    ]
-      .filter(Boolean)
-      .join(' | ');
+  if (!reviewsRes.ok) {
+    const details = await readErrorText(reviewsRes);
     throw new Error(details || 'No se pudo revisar duplicados de Booking');
   }
 
-  const detailRows = await detailsRes.json();
   const reviewRows = await reviewsRes.json();
-  const bookingKeyFilter = new Set(bookingKeys);
   const externalIdFilter = new Set(externalIds);
 
-  (Array.isArray(detailRows) ? detailRows : []).forEach((row) => {
-    if (row?.booking_review_key && bookingKeyFilter.has(row.booking_review_key)) {
-      existingKeys.add(row.booking_review_key);
-    }
-  });
   (Array.isArray(reviewRows) ? reviewRows : []).forEach((row) => {
     if (row?.external_review_id && externalIdFilter.has(row.external_review_id)) {
       existingExternalIds.add(row.external_review_id);
@@ -836,24 +843,28 @@ async function importBookingCsv({ propertyId, filename, csvBase64, uploadedBy })
     .filter(Boolean)
     .sort();
 
-  await createImportBatch({
-    id: importBatchId,
-    property_id: propertyId,
-    source_filename: filename || 'booking.csv',
-    uploaded_by: normalizeText(uploadedBy) || null,
-    rows_detected: parsedRows.length,
-    rows_new: rowsToInsert.length,
-    rows_duplicate_existing: parsedRows.filter((row) => row.status === 'duplicate_existing').length,
-    rows_duplicate_in_file: parsedRows.filter((row) => row.status === 'duplicate_in_file').length,
-    rows_invalid: parsedRows.filter((row) => row.status === 'invalid').length,
-    rows_translated: translationResult.translatedRows,
-    review_date_from: reviewDateValues[0] || null,
-    review_date_to: reviewDateValues[reviewDateValues.length - 1] || null,
-    status: 'processing',
-    metadata: {
-      translationConfigured: translationResult.translationConfigured,
-    },
-  });
+  try {
+    await createImportBatch({
+      id: importBatchId,
+      property_id: propertyId,
+      source_filename: filename || 'booking.csv',
+      uploaded_by: normalizeText(uploadedBy) || null,
+      rows_detected: parsedRows.length,
+      rows_new: rowsToInsert.length,
+      rows_duplicate_existing: parsedRows.filter((row) => row.status === 'duplicate_existing').length,
+      rows_duplicate_in_file: parsedRows.filter((row) => row.status === 'duplicate_in_file').length,
+      rows_invalid: parsedRows.filter((row) => row.status === 'invalid').length,
+      rows_translated: translationResult.translatedRows,
+      review_date_from: reviewDateValues[0] || null,
+      review_date_to: reviewDateValues[reviewDateValues.length - 1] || null,
+      status: 'processing',
+      metadata: {
+        translationConfigured: translationResult.translationConfigured,
+      },
+    });
+  } catch (error) {
+    throw toBookingSetupError(error, 'importar reviews de Booking');
+  }
 
   const reviewRows = rowsToInsert.map((row, index) => ({
     id: reviewIds[index],
@@ -952,7 +963,7 @@ async function importBookingCsv({ propertyId, filename, csvBase64, uploadedBy })
     } catch (cleanupError) {
       console.error('[booking-import] cleanup batch error', cleanupError.message);
     }
-    throw error;
+    throw toBookingSetupError(error, 'importar reviews de Booking');
   }
 
   return {
@@ -1079,6 +1090,27 @@ async function loadBookingDashboard({ propertyId, year, month }) {
     ]
       .filter(Boolean)
       .join(' | ');
+    if (isMissingBookingTableError(details)) {
+      const emptyAnalytics = aggregateBookingRows([]);
+      return {
+        property,
+        setupRequired: true,
+        setupMessage: bookingSetupMessage(
+          'mostrar analytics de Booking',
+          detectMissingBookingTableName(details) || 'booking_review_details'
+        ),
+        filters: {
+          availableYears: [],
+          selectedYear: year || '',
+          selectedMonth: month || '',
+        },
+        summary: emptyAnalytics.summary,
+        monthly: emptyAnalytics.monthly,
+        areaSummary: [],
+        recentReviews: [],
+        importBatches: [],
+      };
+    }
     throw new Error(details || 'No se pudo cargar el dashboard de Booking');
   }
 
