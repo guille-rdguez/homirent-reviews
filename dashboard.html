@@ -999,6 +999,7 @@ body.auth-ready .auth-screen { display:none; }
             <option value="">Selecciona un complejo</option>
           </select>
           <button class="btn btn-ghost btn-sm" id="booking-open-comments-btn" onclick="openSelectedBookingComments()" disabled>Ver comentarios ↗</button>
+          <button class="btn btn-ghost btn-sm" id="booking-config-comments-btn" onclick="configureSelectedBookingCommentsUrl()" disabled>Pegar URL actual</button>
           <div class="link-pill" id="booking-translate-pill">Traducción opcional</div>
         </div>
       </div>
@@ -1196,11 +1197,14 @@ const API_BOOKING_PREVIEW='/api/dashboard-booking-preview';
 const API_BOOKING_IMPORT='/api/dashboard-booking-import';
 const API_RESET_INBOUND='/api/internal/reset-inbound-matched';
 const API_REPROCESS_BATCH='/api/internal/reprocess-inbound-batch';
+const BOOKING_LINK_OVERRIDE_STORAGE_KEY='booking_review_url_overrides_v1';
 let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false,allReservations=[],resFiltered=[],reservationsLoaded=false,allGoogleReviews=[],googleFiltered=[],googleLoaded=false;
 let bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,overview:[],selectedProperty:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:'',overviewSetupRequired:false,overviewSetupMessage:''};
 const AVC=['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#f87171'];
 
 function readAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||'null');}catch(e){return null;}}
+function readBookingLinkOverrides(){try{const parsed=JSON.parse(localStorage.getItem(BOOKING_LINK_OVERRIDE_STORAGE_KEY)||'{}');return parsed&&typeof parsed==='object'?parsed:{};}catch(e){return {};}}
+function persistBookingLinkOverrides(map){localStorage.setItem(BOOKING_LINK_OVERRIDE_STORAGE_KEY,JSON.stringify(map||{}));}
 function persistAuthSession(session){localStorage.setItem(AUTH_STORAGE_KEY,JSON.stringify({...session,granted:true,at:Date.now()}));}
 function clearAuthSession(){localStorage.removeItem(AUTH_STORAGE_KEY);}
 function setAuthError(msg=''){const el=document.getElementById('auth-error');el.textContent=msg;el.classList.toggle('show',!!msg);}
@@ -1381,6 +1385,15 @@ function syncBookingYearFilter(years=[]){
 function getBookingOverviewItem(propertyId=''){
   return (bookingState.overview||[]).find(item=>item.propertyId===propertyId)||null;
 }
+function getEffectiveBookingUrl(item){
+  if(!item?.propertyId)return '';
+  const overrides=readBookingLinkOverrides();
+  return normalizeSpaces(overrides[item.propertyId]||item.bookingUrl||'');
+}
+function hasBookingLinkOverride(propertyId=''){
+  const overrides=readBookingLinkOverrides();
+  return !!normalizeSpaces(overrides[propertyId]||'');
+}
 function bookingHealth(item){
   if(!item)return{label:'Sin seleccionar',color:'var(--text3)',border:'rgba(255,255,255,0.08)'};
   if(!item.bookingUrl)return{label:'Link pendiente',color:'var(--amber)',border:'rgba(251,191,36,0.35)'};
@@ -1411,6 +1424,8 @@ function renderBookingOverview(){
   grid.innerHTML=overview.map(item=>{
     const selected=item.propertyId===bookingState.propertyId;
     const health=bookingHealth(item);
+    const bookingUrl=getEffectiveBookingUrl(item);
+    const hasOverride=hasBookingLinkOverride(item.propertyId);
     const lastWindow=item.lastReviewDateFrom&&item.lastReviewDateTo
       ? `${formatShortDate(item.lastReviewDateFrom)} → ${formatShortDate(item.lastReviewDateTo)}`
       : item.lastImportAt
@@ -1431,9 +1446,10 @@ function renderBookingOverview(){
       </div>
       <div style="margin-top:12px;font-size:12px;color:var(--text2);line-height:1.5">${escapeHtml(lastWindow)}</div>
       <div style="margin-top:4px;font-size:11px;color:var(--text3)">${escapeHtml(item.lastFileName||'Aún no hay CSV cargado')}</div>
+      <div style="margin-top:6px;font-size:11px;color:${hasOverride?'var(--green-acc)':'var(--text3)'}">${hasOverride?'URL local guardada en este navegador':'Usando link base de Booking'}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-        ${item.bookingUrl
-          ? `<a class="btn btn-primary btn-sm" href="${escapeHtml(item.bookingUrl)}" target="_blank" rel="noopener" style="text-decoration:none">Ver comentarios ↗</a>`
+        ${bookingUrl
+          ? `<button class="btn btn-primary btn-sm" onclick="openBookingComments(${safeJsArg(item.propertyId)})">Ver comentarios ↗</button>`
           : '<button class="btn btn-ghost btn-sm" disabled>Link pendiente</button>'}
         <button class="btn btn-ghost btn-sm" onclick="selectBookingProperty(${safeJsArg(item.propertyId)},'upload')">Subir CSV</button>
         <button class="btn btn-ghost btn-sm" onclick="selectBookingProperty(${safeJsArg(item.propertyId)},'analytics')">Ver analytics</button>
@@ -1449,6 +1465,7 @@ function renderBookingWorkspaceChrome(){
   const previewBtn=document.getElementById('booking-preview-btn');
   const importBtn=document.getElementById('booking-import-btn');
   const openCommentsBtn=document.getElementById('booking-open-comments-btn');
+  const configCommentsBtn=document.getElementById('booking-config-comments-btn');
   if(document.getElementById('booking-prop'))document.getElementById('booking-prop').value=bookingState.propertyId||'';
   if(!selected){
     if(uploadSub)uploadSub.textContent='Selecciona una propiedad arriba para empezar.';
@@ -1460,29 +1477,66 @@ function renderBookingWorkspaceChrome(){
       openCommentsBtn.disabled=true;
       openCommentsBtn.textContent='Ver comentarios ↗';
     }
+    if(configCommentsBtn){
+      configCommentsBtn.disabled=true;
+      configCommentsBtn.textContent='Pegar URL actual';
+    }
     return;
   }
+  const bookingUrl=getEffectiveBookingUrl(selected);
+  const hasOverride=hasBookingLinkOverride(selected.propertyId);
   if(uploadSub)uploadSub.textContent=`Propiedad seleccionada: ${selected.name} (${bookingCityLabel(selected.city)})`;
   if(fileMeta&&!bookingState.preview){
-    fileMeta.textContent=`Propiedad: ${selected.name} · ${selected.bookingUrl?'Link de comentarios listo':'Falta configurar el link de comentarios'} · ${selected.lastImportAt?`Última carga: ${formatShortDate(selected.lastImportAt)}`:'Sin cargas previas'}`;
+    fileMeta.textContent=`Propiedad: ${selected.name} · ${bookingUrl?(hasOverride?'Usando URL local guardada en este navegador':'Usando link base de Booking'):'Falta configurar el link de comentarios'} · ${selected.lastImportAt?`Última carga: ${formatShortDate(selected.lastImportAt)}`:'Sin cargas previas'}`;
   }
   if(fileInput)fileInput.disabled=false;
   if(previewBtn&&previewBtn.textContent==='Analizar CSV')previewBtn.disabled=false;
   if(openCommentsBtn){
-    openCommentsBtn.disabled=!selected.bookingUrl;
-    openCommentsBtn.textContent=selected.bookingUrl?'Ver comentarios ↗':'Link pendiente';
+    openCommentsBtn.disabled=!bookingUrl;
+    openCommentsBtn.textContent=bookingUrl?'Ver comentarios ↗':'Link pendiente';
+  }
+  if(configCommentsBtn){
+    configCommentsBtn.disabled=false;
+    configCommentsBtn.textContent=hasOverride?'Editar URL actual':'Pegar URL actual';
   }
 }
 function openBookingComments(propertyId=''){
   const selected=getBookingOverviewItem(propertyId);
-  if(!selected?.bookingUrl){
+  const bookingUrl=getEffectiveBookingUrl(selected);
+  if(!bookingUrl){
     notify('🔗','Esta propiedad aún no tiene un link de Booking configurado');
     return;
   }
-  window.open(selected.bookingUrl,'_blank','noopener');
+  window.open(bookingUrl,'_blank','noopener');
 }
 function openSelectedBookingComments(){
   openBookingComments(bookingState.propertyId);
+}
+function configureSelectedBookingCommentsUrl(){
+  const selected=getBookingOverviewItem(bookingState.propertyId);
+  if(!selected){notify('⚠️','Selecciona una propiedad antes de configurar su link');return;}
+  const current=getEffectiveBookingUrl(selected)||'';
+  const input=window.prompt(`Pega la URL actual de Booking para ${selected.name}. Se guardará solo en este navegador.`,current);
+  if(input===null)return;
+  const next=normalizeSpaces(input);
+  const overrides=readBookingLinkOverrides();
+  if(!next){
+    delete overrides[selected.propertyId];
+    persistBookingLinkOverrides(overrides);
+    renderBookingOverview();
+    renderBookingWorkspaceChrome();
+    notify('🧹',`Se eliminó la URL local de ${selected.name}`);
+    return;
+  }
+  if(!/^https?:\/\/admin\.booking\.com\//i.test(next) && !/^https?:\/\/account\.booking\.com\//i.test(next)){
+    notify('⚠️','Pega una URL válida de Booking extranet');
+    return;
+  }
+  overrides[selected.propertyId]=next;
+  persistBookingLinkOverrides(overrides);
+  renderBookingOverview();
+  renderBookingWorkspaceChrome();
+  notify('🔗',`URL actual guardada para ${selected.name}`);
 }
 async function selectBookingProperty(propertyId='',focus='upload'){
   if(!propertyId)return;
