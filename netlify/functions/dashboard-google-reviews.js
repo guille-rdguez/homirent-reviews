@@ -12,16 +12,40 @@ const {
 async function getReviews() {
   const { url } = getSupabaseConfig();
   const headers = createSupabaseHeaders();
-  const params = new URLSearchParams({
-    select: 'id,guest_name,rating,comment,review_url,place_id,published_at,responded,responded_at,property_id,properties(name,city)',
+
+  const reviewParams = new URLSearchParams({
+    select: 'id,guest_name,rating,comment,review_url,place_id,published_at,responded,responded_at,property_id',
     order: 'published_at.desc',
   });
-  const res = await fetch(`${url}/rest/v1/google_reviews?${params}`, { headers });
-  if (!res.ok) {
-    const details = await readErrorText(res);
-    throw new Error(details || `Supabase devolvio ${res.status}`);
+  const propertyParams = new URLSearchParams({
+    select: 'id,name,city',
+    active: 'eq.true',
+  });
+
+  const [reviewsRes, propertiesRes] = await Promise.all([
+    fetch(`${url}/rest/v1/google_reviews?${reviewParams.toString()}`, { headers }),
+    fetch(`${url}/rest/v1/properties?${propertyParams.toString()}`, { headers }),
+  ]);
+
+  if (!reviewsRes.ok || !propertiesRes.ok) {
+    const details = [
+      !reviewsRes.ok ? await readErrorText(reviewsRes) : '',
+      !propertiesRes.ok ? await readErrorText(propertiesRes) : '',
+    ]
+      .filter(Boolean)
+      .join(' | ');
+    throw new Error(details || 'No se pudieron cargar las Google Reviews');
   }
-  return res.json();
+
+  const [reviews, properties] = await Promise.all([reviewsRes.json(), propertiesRes.json()]);
+  const propertyMap = new Map(
+    (Array.isArray(properties) ? properties : []).map((property) => [property.id, property])
+  );
+
+  return (Array.isArray(reviews) ? reviews : []).map((review) => ({
+    ...review,
+    properties: propertyMap.get(review.property_id) || null,
+  }));
 }
 
 async function markResponded(id, responded) {

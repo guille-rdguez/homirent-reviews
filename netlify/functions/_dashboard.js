@@ -172,14 +172,51 @@ async function readErrorText(response) {
   }
 }
 
+function isPlaceholderEnvValue(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return true;
+  return (
+    normalized.startsWith('tu_') ||
+    normalized.includes('pega_aqui') ||
+    normalized.includes('example') ||
+    normalized === 'xxx' ||
+    normalized === 'xxxx'
+  );
+}
+
+function decodeJwtPayload(token) {
+  const value = String(token || '').trim();
+  const parts = value.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+  } catch (error) {
+    return null;
+  }
+}
+
+function isServiceRoleCapableKey(value) {
+  const raw = String(value || '').trim();
+  if (!raw || isPlaceholderEnvValue(raw)) return false;
+  if (raw.startsWith('sb_secret_')) return true;
+  const payload = decodeJwtPayload(raw);
+  return payload?.role === 'service_role';
+}
+
 function getSupabaseConfig() {
-  const url = process.env.SUPABASE_URL;
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_DASHBOARD_KEY;
+  const rawUrl = process.env.SUPABASE_URL;
+  const rawServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const rawDashboardKey = process.env.SUPABASE_DASHBOARD_KEY;
+  const url = isPlaceholderEnvValue(rawUrl) ? '' : rawUrl;
+  const key = isServiceRoleCapableKey(rawServiceRoleKey)
+    ? rawServiceRoleKey
+    : isServiceRoleCapableKey(rawDashboardKey)
+      ? rawDashboardKey
+      : '';
 
   if (!url || !key) {
     throw new Error(
-      'Faltan SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en el entorno del dashboard'
+      'Faltan SUPABASE_URL y una SUPABASE_SERVICE_ROLE_KEY real. La SUPABASE_DASHBOARD_KEY actual no tiene permisos suficientes para leer el dashboard interno.'
     );
   }
 
@@ -209,7 +246,7 @@ async function fetchDashboardData() {
   const propertiesUrl =
     `${url}/rest/v1/properties?select=id,city,name&active=eq.true&order=city,name`;
   const reviewsUrl =
-    `${url}/rest/v1/reviews?select=id,guest_name,room_name,rating,comment,would_return,source,channel,created_at,property_id,raw_payload,properties(name,city)&order=created_at.desc&limit=2000`;
+    `${url}/rest/v1/reviews?select=id,guest_name,room_name,rating,comment,would_return,source,channel,created_at,reviewed_at,property_id,raw_payload,properties(name,city)&order=created_at.desc&limit=2000`;
 
   const [propertiesRes, reviewsRes] = await Promise.all([
     fetch(propertiesUrl, { headers }),

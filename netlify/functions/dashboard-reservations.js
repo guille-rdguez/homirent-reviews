@@ -14,22 +14,50 @@ exports.handler = async (event) => {
   const { error } = requireSession(event);
   if (error) return error;
 
-  const { url } = getSupabaseConfig();
-  const headers = createSupabaseHeaders();
+  try {
+    const { url } = getSupabaseConfig();
+    const headers = createSupabaseHeaders();
 
-  const params = new URLSearchParams({
-    select: 'id,guest_name,room_name,status,channel,check_in,check_out,property_id,properties(name,city)',
-    order: 'check_out.desc',
-    limit: '2000',
-  });
+    const reservationParams = new URLSearchParams({
+      select: 'id,guest_name,room_name,status,channel,check_in,check_out,property_id',
+      order: 'check_out.desc',
+      limit: '2000',
+    });
+    const propertyParams = new URLSearchParams({
+      select: 'id,name,city',
+      active: 'eq.true',
+    });
 
-  const response = await fetch(`${url}/rest/v1/reservations?${params}`, { headers });
+    const [reservationsRes, propertiesRes] = await Promise.all([
+      fetch(`${url}/rest/v1/reservations?${reservationParams.toString()}`, { headers }),
+      fetch(`${url}/rest/v1/properties?${propertyParams.toString()}`, { headers }),
+    ]);
 
-  if (!response.ok) {
-    const details = await readErrorText(response);
-    return serverError(details || `Supabase devolvio ${response.status} al leer reservations`);
+    if (!reservationsRes.ok || !propertiesRes.ok) {
+      const details = [
+        !reservationsRes.ok ? await readErrorText(reservationsRes) : '',
+        !propertiesRes.ok ? await readErrorText(propertiesRes) : '',
+      ]
+        .filter(Boolean)
+        .join(' | ');
+      return serverError(details || 'No se pudieron cargar las reservaciones de Cloudbeds');
+    }
+
+    const [reservations, properties] = await Promise.all([
+      reservationsRes.json(),
+      propertiesRes.json(),
+    ]);
+    const propertyMap = new Map(
+      (Array.isArray(properties) ? properties : []).map((property) => [property.id, property])
+    );
+    const rows = (Array.isArray(reservations) ? reservations : []).map((reservation) => ({
+      ...reservation,
+      properties: propertyMap.get(reservation.property_id) || null,
+    }));
+
+    return json(200, { ok: true, reservations: rows });
+  } catch (err) {
+    console.error(err);
+    return serverError(err.message || 'No se pudieron cargar las reservaciones de Cloudbeds');
   }
-
-  const reservations = await response.json();
-  return json(200, { ok: true, reservations: Array.isArray(reservations) ? reservations : [] });
 };

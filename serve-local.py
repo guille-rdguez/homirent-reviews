@@ -10,6 +10,7 @@ import hmac
 import json
 import os
 import re
+import subprocess
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -172,14 +173,53 @@ def validate_credentials(username: str, password: str) -> bool:
     )
 
 
-def supabase_config() -> tuple[str, str]:
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get(
-        "SUPABASE_DASHBOARD_KEY"
+def is_placeholder_env_value(value: str | None) -> bool:
+    normalized = normalize_whitespace(value).lower()
+    if not normalized:
+        return True
+    return (
+        normalized.startswith("tu_")
+        or "pega_aqui" in normalized
+        or "example" in normalized
+        or normalized in {"xxx", "xxxx"}
     )
+
+
+def decode_jwt_payload(token: str | None) -> dict | None:
+    raw = normalize_whitespace(token)
+    parts = raw.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        return json.loads(base64url_decode(parts[1]))
+    except (ValueError, json.JSONDecodeError):
+        return None
+
+
+def is_service_role_capable_key(value: str | None) -> bool:
+    raw = normalize_whitespace(value)
+    if not raw or is_placeholder_env_value(raw):
+        return False
+    if raw.startswith("sb_secret_"):
+        return True
+    payload = decode_jwt_payload(raw)
+    return bool(isinstance(payload, dict) and payload.get("role") == "service_role")
+
+
+def supabase_config() -> tuple[str, str]:
+    raw_url = os.environ.get("SUPABASE_URL")
+    raw_service_role_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    raw_dashboard_key = os.environ.get("SUPABASE_DASHBOARD_KEY")
+    url = "" if is_placeholder_env_value(raw_url) else str(raw_url)
+    if is_service_role_capable_key(raw_service_role_key):
+        key = str(raw_service_role_key)
+    elif is_service_role_capable_key(raw_dashboard_key):
+        key = str(raw_dashboard_key)
+    else:
+        key = ""
     if not url or not key:
         raise RuntimeError(
-            "Faltan SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY para el dashboard seguro"
+            "Faltan SUPABASE_URL y una SUPABASE_SERVICE_ROLE_KEY real. La SUPABASE_DASHBOARD_KEY actual no tiene permisos suficientes para leer el dashboard interno."
         )
     return url, key
 
@@ -1414,6 +1454,119 @@ def process_inbound_message(payload: dict | None = None) -> dict[str, object]:
     }
 
 
+def reset_inbound_matched_messages() -> int:
+    rows = supabase_request_json(
+        "inbound_messages?select=id&parse_status=eq.matched&order=received_at.asc"
+    )
+    total = len(rows) if isinstance(rows, list) else 0
+    if total:
+        supabase_request_json(
+            "inbound_messages?parse_status=eq.matched",
+            method="PATCH",
+            payload={"parse_status": "needs_review"},
+            prefer="return=minimal",
+        )
+    return total
+
+
+def list_pending_inbound_messages(status: str = "needs_review") -> list[dict]:
+    rows = supabase_request_json(
+        f"inbound_messages?select=id&parse_status=eq.{urlparse.quote(status, safe='')}&order=received_at.asc&limit=200"
+    )
+    return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+
+
+def reprocess_inbound_batch(status: str = "needs_review", limit: int = 20) -> dict[str, int]:
+    all_messages = list_pending_inbound_messages(status)
+    batch = all_messages[:limit]
+    matched = 0
+    ignored = 0
+    errors = 0
+
+    for row in batch:
+        message_id = normalize_whitespace(row.get("id"))
+        if not message_id:
+            errors += 1
+            continue
+        try:
+            result = process_inbound_message({"inboundMessageId": message_id, "force": False})
+            if result.get("status") == "matched":
+                matched += 1
+            else:
+                ignored += 1
+        except Exception as exc:
+            print(f"[reprocess-batch] Error en {message_id}: {exc}")
+            errors += 1
+
+    return {
+        "processed": len(batch),
+        "remaining": max(0, len(all_messages) - len(batch)),
+        "matched": matched,
+        "ignored": ignored,
+        "errors": errors,
+    }
+
+
+def run_booking_local_action(action: str, payload: dict | None = None) -> dict:
+    script = """
+const fs = require('fs');
+const { buildPreview, importBookingCsv, loadBookingDashboard } = require('./netlify/functions/_booking_reviews');
+const action = process.argv[1];
+const input = JSON.parse(fs.readFileSync(0, 'utf8') || '{}');
+
+(async () => {
+  try {
+    let result;
+    if (action === 'preview') {
+      result = await buildPreview(input);
+    } else if (action === 'import') {
+      result = await importBookingCsv(input);
+    } else if (action === 'data') {
+      result = await loadBookingDashboard(input);
+    } else {
+      throw new Error(`Accion Booking no soportada: ${action}`);
+    }
+    process.stdout.write(JSON.stringify({ ok: true, result }));
+  } catch (error) {
+    process.stdout.write(JSON.stringify({
+      ok: false,
+      error: error && error.message ? error.message : String(error),
+    }));
+    process.exitCode = 1;
+  }
+})();
+"""
+    try:
+        completed = subprocess.run(
+            ["node", "-e", script, action],
+            input=json.dumps(payload or {}, ensure_ascii=False),
+            text=True,
+            capture_output=True,
+            cwd=str(ROOT),
+            timeout=180,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("Node.js no esta disponible para procesar Booking en local") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("Booking tardo demasiado en responder en local") from exc
+
+    stdout = (completed.stdout or "").strip()
+    stderr = (completed.stderr or "").strip()
+    if not stdout:
+        raise RuntimeError(stderr or "Booking no devolvio respuesta")
+
+    try:
+        response = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(stderr or stdout or "Booking devolvio una respuesta invalida") from exc
+
+    if not response.get("ok"):
+        raise RuntimeError(str(response.get("error") or stderr or "Error al procesar Booking"))
+
+    return response.get("result") if isinstance(response.get("result"), dict) else {}
+
+
 def create_property(name: str, city: str) -> dict:
     normalized_name = normalize_whitespace(name)
     normalized_city = normalize_whitespace(city)
@@ -1467,14 +1620,77 @@ def delete_review(review_id: str) -> bool:
 
 
 def fetch_dashboard_data() -> dict[str, list[dict]]:
-    return {
-        "properties": supabase_json(
-            "properties?select=id,city,name&active=eq.true&order=city,name"
-        ),
-        "reviews": supabase_json(
-            "reviews?select=id,guest_name,room_name,rating,comment,would_return,source,created_at,property_id,properties(name,city)&order=created_at.desc&limit=2000"
-        ),
+    properties = supabase_request_json(
+        "properties?select=id,city,name&active=eq.true&order=city,name"
+    )
+    property_map = {
+        str(row.get("id")): row for row in properties if isinstance(row, dict) and row.get("id")
     }
+    reviews = supabase_request_json(
+        "reviews?select=id,guest_name,room_name,rating,comment,would_return,source,channel,created_at,reviewed_at,property_id,raw_payload&order=created_at.desc&limit=2000"
+    )
+    review_rows = []
+    for row in reviews if isinstance(reviews, list) else []:
+        if not isinstance(row, dict):
+            continue
+        enriched = dict(row)
+        enriched["properties"] = property_map.get(str(row.get("property_id"))) or None
+        review_rows.append(enriched)
+
+    return {
+        "properties": properties if isinstance(properties, list) else [],
+        "reviews": review_rows,
+    }
+
+
+def list_active_properties() -> list[dict]:
+    rows = supabase_request_json("properties?select=id,name,city&active=eq.true&order=city,name")
+    return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+
+
+def attach_property_rows(rows: object, properties: list[dict]) -> list[dict]:
+    property_map = {
+        str(row.get("id")): row for row in properties if isinstance(row, dict) and row.get("id")
+    }
+    output: list[dict] = []
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        enriched = dict(row)
+        enriched["properties"] = property_map.get(str(row.get("property_id"))) or None
+        output.append(enriched)
+    return output
+
+
+def fetch_dashboard_reservations() -> list[dict]:
+    properties = list_active_properties()
+    rows = supabase_request_json(
+        "reservations?select=id,guest_name,room_name,status,channel,check_in,check_out,property_id&order=check_out.desc&limit=2000"
+    )
+    return attach_property_rows(rows, properties)
+
+
+def fetch_dashboard_google_reviews() -> list[dict]:
+    properties = list_active_properties()
+    rows = supabase_request_json(
+        "google_reviews?select=id,guest_name,rating,comment,review_url,place_id,published_at,responded,responded_at,property_id&order=published_at.desc"
+    )
+    return attach_property_rows(rows, properties)
+
+
+def mark_google_review_responded(review_id: str, responded: bool) -> None:
+    payload = {
+        "responded": responded,
+        "responded_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        if responded
+        else None,
+    }
+    supabase_request_json(
+        f"google_reviews?id=eq.{urlparse.quote(review_id, safe='')}",
+        method="PATCH",
+        payload=payload,
+        prefer="return=minimal",
+    )
 
 
 class ReusableTCPServer(ThreadingMixIn, TCPServer):
@@ -1508,12 +1724,20 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             ("POST", "/api/dashboard-login"): self.handle_dashboard_login,
             ("GET", "/api/dashboard-session"): self.handle_dashboard_session,
             ("GET", "/api/dashboard-data"): self.handle_dashboard_data,
+            ("GET", "/api/dashboard-booking-data"): self.handle_dashboard_booking_data,
+            ("GET", "/api/dashboard-reservations"): self.handle_dashboard_reservations,
+            ("GET", "/api/dashboard-google-reviews"): self.handle_dashboard_google_reviews,
+            ("POST", "/api/dashboard-google-reviews"): self.handle_dashboard_google_reviews_update,
+            ("POST", "/api/dashboard-booking-preview"): self.handle_dashboard_booking_preview,
+            ("POST", "/api/dashboard-booking-import"): self.handle_dashboard_booking_import,
             ("POST", "/api/dashboard-create-property"): self.handle_dashboard_create_property,
             ("POST", "/api/dashboard-delete-review"): self.handle_dashboard_delete_review,
             ("POST", "/api/dashboard-logout"): self.handle_dashboard_logout,
             ("POST", "/api/internal/cloudbeds-sync"): self.handle_cloudbeds_sync,
             ("POST", "/api/inbound/email"): self.handle_inbound_email,
             ("POST", "/api/internal/process-inbound-message"): self.handle_process_inbound_message,
+            ("POST", "/api/internal/reset-inbound-matched"): self.handle_reset_inbound_matched,
+            ("POST", "/api/internal/reprocess-inbound-batch"): self.handle_reprocess_inbound_batch,
         }
 
         handler = routes.get((self.command, path))
@@ -1662,6 +1886,265 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return
 
         self.send_json(HTTPStatus.OK, {"ok": True, **data})
+
+    def handle_dashboard_booking_data(self) -> None:
+        try:
+            self.require_session()
+            parsed = urlparse.urlparse(self.path)
+            query = urlparse.parse_qs(parsed.query, keep_blank_values=True)
+            payload = {
+                "propertyId": normalize_whitespace((query.get("propertyId") or [""])[0]),
+                "year": normalize_whitespace((query.get("year") or [""])[0]),
+                "month": normalize_whitespace((query.get("month") or [""])[0]),
+            }
+            if not payload["propertyId"]:
+                self.send_json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"ok": False, "error": "propertyId es obligatorio"},
+                )
+                return
+            result = run_booking_local_action("data", payload)
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+
+        self.send_json(HTTPStatus.OK, {"ok": True, **result})
+
+    def handle_dashboard_reservations(self) -> None:
+        try:
+            self.require_session()
+            reservations = fetch_dashboard_reservations()
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except urlerror.HTTPError as exc:
+            details = exc.read().decode("utf-8", errors="replace").strip()
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {
+                    "ok": False,
+                    "error": details or f"Supabase devolvio {exc.code}",
+                },
+            )
+            return
+        except urlerror.URLError as exc:
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": f"No se pudo conectar a Supabase: {exc.reason}"},
+            )
+            return
+
+        self.send_json(HTTPStatus.OK, {"ok": True, "reservations": reservations})
+
+    def handle_dashboard_google_reviews(self) -> None:
+        try:
+            self.require_session()
+            reviews = fetch_dashboard_google_reviews()
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except urlerror.HTTPError as exc:
+            details = exc.read().decode("utf-8", errors="replace").strip()
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {
+                    "ok": False,
+                    "error": details or f"Supabase devolvio {exc.code}",
+                },
+            )
+            return
+        except urlerror.URLError as exc:
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": f"No se pudo conectar a Supabase: {exc.reason}"},
+            )
+            return
+
+        self.send_json(HTTPStatus.OK, {"ok": True, "reviews": reviews})
+
+    def handle_dashboard_google_reviews_update(self) -> None:
+        payload = self.read_json_body()
+        if payload is None:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "Body JSON invalido"},
+            )
+            return
+
+        review_id = str(payload.get("id", "")).strip()
+        responded = payload.get("responded")
+        if not review_id:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "id es obligatorio"},
+            )
+            return
+        if not isinstance(responded, bool):
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "responded debe ser boolean"},
+            )
+            return
+
+        try:
+            self.require_session()
+            mark_google_review_responded(review_id, responded)
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except urlerror.HTTPError as exc:
+            details = exc.read().decode("utf-8", errors="replace").strip()
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {
+                    "ok": False,
+                    "error": details or f"Supabase devolvio {exc.code}",
+                },
+            )
+            return
+        except urlerror.URLError as exc:
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": f"No se pudo conectar a Supabase: {exc.reason}"},
+            )
+            return
+
+        self.send_json(HTTPStatus.OK, {"ok": True})
+
+    def handle_dashboard_booking_preview(self) -> None:
+        payload = self.read_json_body()
+        if payload is None:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "Body JSON invalido"},
+            )
+            return
+
+        property_id = normalize_whitespace(payload.get("propertyId"))
+        csv_base64 = normalize_whitespace(payload.get("csvBase64"))
+        if not property_id:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "propertyId es obligatorio"},
+            )
+            return
+        if not csv_base64:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "csvBase64 es obligatorio"},
+            )
+            return
+
+        try:
+            self.require_session()
+            result = run_booking_local_action(
+                "preview",
+                {
+                    "propertyId": property_id,
+                    "filename": normalize_whitespace(payload.get("filename")) or "booking.csv",
+                    "csvBase64": csv_base64,
+                },
+            )
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+
+        self.send_json(HTTPStatus.OK, {"ok": True, **result})
+
+    def handle_dashboard_booking_import(self) -> None:
+        payload = self.read_json_body()
+        if payload is None:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "Body JSON invalido"},
+            )
+            return
+
+        property_id = normalize_whitespace(payload.get("propertyId"))
+        csv_base64 = normalize_whitespace(payload.get("csvBase64"))
+        if not property_id:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "propertyId es obligatorio"},
+            )
+            return
+        if not csv_base64:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "csvBase64 es obligatorio"},
+            )
+            return
+
+        try:
+            session = self.require_session()
+            result = run_booking_local_action(
+                "import",
+                {
+                    "propertyId": property_id,
+                    "filename": normalize_whitespace(payload.get("filename")) or "booking.csv",
+                    "csvBase64": csv_base64,
+                    "uploadedBy": session.get("username") or "dashboard",
+                },
+            )
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+
+        self.send_json(HTTPStatus.OK, {"ok": True, **result})
 
     def handle_dashboard_create_property(self) -> None:
         payload = self.read_json_body()
@@ -1913,14 +2396,84 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             {"ok": True, "authMode": auth_mode, **result},
         )
 
+    def handle_reset_inbound_matched(self) -> None:
+        try:
+            self.require_session()
+            total = reset_inbound_matched_messages()
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except urlerror.HTTPError as exc:
+            details = exc.read().decode("utf-8", errors="replace").strip()
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": details or f"Supabase devolvio {exc.code}"},
+            )
+            return
+        except urlerror.URLError as exc:
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": f"No se pudo resetear inbound messages: {exc.reason}"},
+            )
+            return
+
+        self.send_json(
+            HTTPStatus.OK,
+            {"ok": True, "reset": total},
+        )
+
+    def handle_reprocess_inbound_batch(self) -> None:
+        try:
+            auth_mode = self.require_inbound_access()
+            result = reprocess_inbound_batch("needs_review", 20)
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except urlerror.HTTPError as exc:
+            details = exc.read().decode("utf-8", errors="replace").strip()
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": details or f"Supabase devolvio {exc.code}"},
+            )
+            return
+        except urlerror.URLError as exc:
+            self.send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {"ok": False, "error": f"No se pudo reprocesar inbound batch: {exc.reason}"},
+            )
+            return
+
+        self.send_json(
+            HTTPStatus.OK,
+            {"ok": True, "authMode": auth_mode, **result},
+        )
+
 
 def print_environment_hints() -> None:
     if not (
-        os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-        or os.environ.get("SUPABASE_DASHBOARD_KEY")
+        is_service_role_capable_key(os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
+        or is_service_role_capable_key(os.environ.get("SUPABASE_DASHBOARD_KEY"))
     ):
         print(
-            "Aviso: falta SUPABASE_SERVICE_ROLE_KEY; el dashboard seguro no podra leer datos."
+            "Aviso: falta una SUPABASE_SERVICE_ROLE_KEY real; la DASHBOARD key actual no alcanza para leer el dashboard interno."
         )
     if not os.environ.get("DASHBOARD_SESSION_SECRET"):
         print(
