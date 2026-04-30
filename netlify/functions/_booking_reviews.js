@@ -152,6 +152,14 @@ function bookingSetupMessage(action = 'usar Booking', tableName = 'booking_revie
   return `Booking necesita la migración de Supabase ${BOOKING_SETUP_MIGRATION} antes de ${action}. Falta la tabla public.${tableName}.`;
 }
 
+function hasGoogleTranslateKey() {
+  return Boolean(normalizeText(process.env.GOOGLE_TRANSLATE_API_KEY));
+}
+
+function bookingTranslationConfigMessage() {
+  return 'Configura GOOGLE_TRANSLATE_API_KEY en Netlify para traducir reviews de Booking.';
+}
+
 function toBookingSetupError(error, action = 'usar Booking') {
   const message = String(error?.message || error || '');
   if (!isMissingBookingTableError(message)) {
@@ -780,7 +788,7 @@ async function buildPreview({ propertyId, filename, csvBase64 }) {
     rowsOutOfScope: parsedRows.filter((row) => row.status === 'out_of_scope').length,
     rowsInvalid: parsedRows.filter((row) => row.status === 'invalid').length,
     monthsDetected: [...new Set(validRows.map((row) => monthKeyFromIso(row.reviewDateIso)).filter(Boolean))].sort(),
-    translationConfigured: Boolean(process.env.GOOGLE_TRANSLATE_API_KEY),
+    translationConfigured: hasGoogleTranslateKey(),
     minReviewYear: BOOKING_MIN_REVIEW_YEAR,
   };
 
@@ -855,14 +863,14 @@ async function enrichRowsWithTranslations(rows = []) {
 
   if (!textTasks.length) {
     return {
-      translationConfigured: Boolean(process.env.GOOGLE_TRANSLATE_API_KEY),
+      translationConfigured: hasGoogleTranslateKey(),
       translatedRows: 0,
       rows,
     };
   }
 
   let translatedRows = 0;
-  let translationConfigured = Boolean(process.env.GOOGLE_TRANSLATE_API_KEY);
+  let translationConfigured = hasGoogleTranslateKey();
 
   try {
     const result = await translateTexts(textTasks);
@@ -917,6 +925,12 @@ async function enrichRowsWithTranslations(rows = []) {
     translatedRows,
     rows,
   };
+}
+
+function isBookingTranslationPending(row = {}) {
+  const status = normalizeText(row.translation_status || row.translationStatus);
+  if (!status) return true;
+  return status === 'not_configured' || status === 'error';
 }
 
 async function createImportBatch(batch) {
@@ -982,6 +996,46 @@ async function insertBookingReviewDetails(rows) {
   if (!res.ok) {
     const details = await readErrorText(res);
     throw new Error(details || `Supabase devolvio ${res.status} al crear booking_review_details`);
+  }
+}
+
+async function upsertBookingReviewDetails(rows) {
+  if (!rows.length) return;
+  const { url } = getSupabaseConfig();
+  const res = await fetch(
+    `${url}/rest/v1/booking_review_details?on_conflict=id`,
+    {
+      method: 'POST',
+      headers: createSupabaseHeaders({
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      }),
+      body: JSON.stringify(rows),
+    }
+  );
+  if (!res.ok) {
+    const details = await readErrorText(res);
+    throw new Error(details || `Supabase devolvio ${res.status} al actualizar booking_review_details`);
+  }
+}
+
+async function upsertReviews(rows) {
+  if (!rows.length) return;
+  const { url } = getSupabaseConfig();
+  const res = await fetch(
+    `${url}/rest/v1/reviews?on_conflict=id`,
+    {
+      method: 'POST',
+      headers: createSupabaseHeaders({
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      }),
+      body: JSON.stringify(rows),
+    }
+  );
+  if (!res.ok) {
+    const details = await readErrorText(res);
+    throw new Error(details || `Supabase devolvio ${res.status} al actualizar reviews booking`);
   }
 }
 
@@ -1191,6 +1245,122 @@ async function importBookingCsv({ propertyId, filename, csvBase64, uploadedBy })
   };
 }
 
+async function listBookingReviewDetailsForTranslation({ propertyId }) {
+  const { url } = getSupabaseConfig();
+  const headers = createSupabaseHeaders();
+  const params = new URLSearchParams({
+    select:
+      'id,review_id,property_id,review_date,review_title,positive_review,negative_review,property_reply,combined_comment,translated_title,translated_positive_review,translated_negative_review,translated_property_reply,translated_combined_comment,source_language,translation_provider,translation_status',
+    property_id: `eq.${propertyId}`,
+    order: 'review_date.desc',
+    limit: '5000',
+  });
+  const res = await fetch(`${url}/rest/v1/booking_review_details?${params.toString()}`, { headers });
+  if (!res.ok) {
+    const details = await readErrorText(res);
+    throw toBookingSetupError(details || `Supabase devolvio ${res.status} al leer booking_review_details`, 'traducir reviews de Booking');
+  }
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function translateExistingBookingReviews({ propertyId, year, month, force = false }) {
+  if (!hasGoogleTranslateKey()) {
+    throw new Error(bookingTranslationConfigMessage());
+  }
+
+  const property = await getPropertyById(propertyId);
+  if (!property) throw new Error('Propiedad invalida o inactiva');
+
+  const rows = await listBookingReviewDetailsForTranslation({ propertyId });
+  const scopedRows = rows.filter((row) => {
+    const iso = String(row.review_date || '');
+    if (!isBookingReviewInScope(iso)) return false;
+    if (year && iso.slice(0, 4) !== String(year)) return false;
+    if (month && iso.slice(5, 7) !== String(month).padStart(2, '0')) return false;
+    return true;
+  });
+
+  const candidates = scopedRows.filter((row) =>
+    Boolean(
+      normalizeText(row.review_title) ||
+        normalizeText(row.positive_review) ||
+        normalizeText(row.negative_review) ||
+        normalizeText(row.property_reply)
+    )
+  );
+  const pendingRows = candidates.filter((row) => force || isBookingTranslationPending(row));
+
+  if (!pendingRows.length) {
+    return {
+      property,
+      summary: {
+        scopedRows: scopedRows.length,
+        candidateRows: candidates.length,
+        processedRows: 0,
+        translatedRows: 0,
+        unchangedRows: candidates.length,
+        errorRows: 0,
+        translationConfigured: true,
+      },
+    };
+  }
+
+  const workRows = pendingRows.map((row) => ({
+    id: row.id,
+    reviewId: row.review_id,
+    reviewDateIso: row.review_date,
+    reviewTitle: cleanTextField(row.review_title),
+    positiveReview: cleanTextField(row.positive_review),
+    negativeReview: cleanTextField(row.negative_review),
+    propertyReply: cleanTextField(row.property_reply),
+    combinedComment: cleanTextField(row.combined_comment),
+    translatedReviewTitle: cleanTextField(row.translated_title),
+    translatedPositiveReview: cleanTextField(row.translated_positive_review),
+    translatedNegativeReview: cleanTextField(row.translated_negative_review),
+    translatedPropertyReply: cleanTextField(row.translated_property_reply),
+    translatedCombinedComment: cleanTextField(row.translated_combined_comment),
+    sourceLanguage: normalizeText(row.source_language).toLowerCase() || null,
+    translationProvider: normalizeText(row.translation_provider) || null,
+    translationStatus: normalizeText(row.translation_status) || null,
+  }));
+
+  const translationResult = await enrichRowsWithTranslations(workRows);
+  const detailUpdates = workRows.map((row) => ({
+    id: row.id,
+    translated_title: row.translatedReviewTitle || null,
+    translated_positive_review: row.translatedPositiveReview || null,
+    translated_negative_review: row.translatedNegativeReview || null,
+    translated_property_reply: row.translatedPropertyReply || null,
+    translated_combined_comment: row.translatedCombinedComment || row.combinedComment || null,
+    source_language: row.sourceLanguage || null,
+    translation_provider: row.translationProvider || null,
+    translation_status: row.translationStatus || 'not_needed',
+  }));
+  const reviewUpdates = workRows
+    .filter((row) => row.reviewId)
+    .map((row) => ({
+      id: row.reviewId,
+      comment: row.translatedCombinedComment || row.combinedComment || null,
+    }));
+
+  await upsertBookingReviewDetails(detailUpdates);
+  await upsertReviews(reviewUpdates);
+
+  return {
+    property,
+    summary: {
+      scopedRows: scopedRows.length,
+      candidateRows: candidates.length,
+      processedRows: workRows.length,
+      translatedRows: translationResult.translatedRows,
+      unchangedRows: workRows.filter((row) => row.translationStatus === 'not_needed').length,
+      errorRows: workRows.filter((row) => row.translationStatus === 'error').length,
+      translationConfigured: translationResult.translationConfigured,
+    },
+  };
+}
+
 function average(values = []) {
   const numeric = values.filter((value) => Number.isFinite(value));
   if (!numeric.length) return null;
@@ -1299,6 +1469,8 @@ async function loadBookingDashboard({ propertyId, year, month }) {
       importBatches: [],
       setupRequired: false,
       setupMessage: '',
+      translationConfigured: hasGoogleTranslateKey(),
+      pendingTranslations: 0,
     };
   }
 
@@ -1374,6 +1546,8 @@ async function loadBookingDashboard({ propertyId, year, month }) {
         areaSummary: [],
         recentReviews: [],
         importBatches: [],
+        translationConfigured: hasGoogleTranslateKey(),
+        pendingTranslations: 0,
       };
     }
     throw new Error(details || 'No se pudo cargar el dashboard de Booking');
@@ -1390,6 +1564,7 @@ async function loadBookingDashboard({ propertyId, year, month }) {
     if (month && iso.slice(5, 7) !== String(month).padStart(2, '0')) return false;
     return true;
   });
+  const pendingTranslations = filteredRows.filter((row) => isBookingTranslationPending(row)).length;
 
   const analytics = aggregateBookingRows(filteredRows);
   return {
@@ -1429,6 +1604,8 @@ async function loadBookingDashboard({ propertyId, year, month }) {
     importBatches: Array.isArray(importBatches) ? importBatches : [],
     setupRequired: false,
     setupMessage: '',
+    translationConfigured: hasGoogleTranslateKey(),
+    pendingTranslations,
   };
 }
 
@@ -1442,4 +1619,5 @@ module.exports = {
   loadBookingDashboard,
   parseBookingCsv,
   scoreToGeneralRating,
+  translateExistingBookingReviews,
 };

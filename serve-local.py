@@ -1510,7 +1510,7 @@ def reprocess_inbound_batch(status: str = "needs_review", limit: int = 20) -> di
 def run_booking_local_action(action: str, payload: dict | None = None) -> dict:
     script = """
 const fs = require('fs');
-const { buildPreview, importBookingCsv, loadBookingDashboard } = require('./netlify/functions/_booking_reviews');
+const { buildPreview, importBookingCsv, loadBookingDashboard, translateExistingBookingReviews } = require('./netlify/functions/_booking_reviews');
 const action = process.argv[1];
 const input = JSON.parse(fs.readFileSync(0, 'utf8') || '{}');
 
@@ -1523,6 +1523,8 @@ const input = JSON.parse(fs.readFileSync(0, 'utf8') || '{}');
       result = await importBookingCsv(input);
     } else if (action === 'data') {
       result = await loadBookingDashboard(input);
+    } else if (action === 'translate') {
+      result = await translateExistingBookingReviews(input);
     } else {
       throw new Error(`Accion Booking no soportada: ${action}`);
     }
@@ -1730,6 +1732,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             ("POST", "/api/dashboard-google-reviews"): self.handle_dashboard_google_reviews_update,
             ("POST", "/api/dashboard-booking-preview"): self.handle_dashboard_booking_preview,
             ("POST", "/api/dashboard-booking-import"): self.handle_dashboard_booking_import,
+            ("POST", "/api/dashboard-booking-translate"): self.handle_dashboard_booking_translate,
             ("POST", "/api/dashboard-create-property"): self.handle_dashboard_create_property,
             ("POST", "/api/dashboard-delete-review"): self.handle_dashboard_delete_review,
             ("POST", "/api/dashboard-logout"): self.handle_dashboard_logout,
@@ -2123,6 +2126,49 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                     "filename": normalize_whitespace(payload.get("filename")) or "booking.csv",
                     "csvBase64": csv_base64,
                     "uploadedBy": session.get("username") or "dashboard",
+                },
+            )
+        except ValueError as exc:
+            self.send_json(
+                HTTPStatus.UNAUTHORIZED,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+        except RuntimeError as exc:
+            self.send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": str(exc)},
+            )
+            return
+
+        self.send_json(HTTPStatus.OK, {"ok": True, **result})
+
+    def handle_dashboard_booking_translate(self) -> None:
+        payload = self.read_json_body()
+        if payload is None:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "Body JSON invalido"},
+            )
+            return
+
+        property_id = normalize_whitespace(payload.get("propertyId"))
+        if not property_id:
+            self.send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": "propertyId es obligatorio"},
+            )
+            return
+
+        try:
+            self.require_session()
+            result = run_booking_local_action(
+                "translate",
+                {
+                    "propertyId": property_id,
+                    "year": normalize_whitespace(payload.get("year")),
+                    "month": normalize_whitespace(payload.get("month")),
+                    "force": bool(payload.get("force")),
                 },
             )
         except ValueError as exc:

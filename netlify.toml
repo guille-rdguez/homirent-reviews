@@ -67,6 +67,11 @@
   to = "/.netlify/functions/dashboard-booking-import"
   status = 200
 
+[[redirects]]
+  from = "/api/dashboard-booking-translate"
+  to = "/.netlify/functions/dashboard-booking-translate"
+  status = 200
+
 [functions."google-reviews-cron"]
   schedule = "0 13 * * *"
 

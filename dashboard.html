@@ -1010,6 +1010,7 @@ body.auth-ready .auth-screen { display:none; }
             <input id="booking-file" type="file" accept=".csv,text/csv" style="max-width:100%;font-size:13px;color:var(--text2)">
             <button class="btn btn-primary btn-sm" id="booking-preview-btn" onclick="previewBookingCsv()">Analizar CSV</button>
             <button class="btn btn-ghost btn-sm" id="booking-import-btn" onclick="importBookingCsv()" disabled>Importar nuevas</button>
+            <button class="btn btn-ghost btn-sm" id="booking-translate-btn" onclick="translateBookingReviews()" disabled>Traducir pendientes</button>
           </div>
           <div style="font-size:12px;color:var(--text3)" id="booking-file-meta">Acepta solo archivos `.csv` de Booking. La respuesta directa en Booking la dejamos para una siguiente fase.</div>
         </div>
@@ -1195,11 +1196,12 @@ const API_GOOGLE_REVIEWS='/api/dashboard-google-reviews';
 const API_BOOKING_DATA='/api/dashboard-booking-data';
 const API_BOOKING_PREVIEW='/api/dashboard-booking-preview';
 const API_BOOKING_IMPORT='/api/dashboard-booking-import';
+const API_BOOKING_TRANSLATE='/api/dashboard-booking-translate';
 const API_RESET_INBOUND='/api/internal/reset-inbound-matched';
 const API_REPROCESS_BATCH='/api/internal/reprocess-inbound-batch';
 const BOOKING_LINK_OVERRIDE_STORAGE_KEY='booking_review_url_overrides_v1';
 let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false,allReservations=[],resFiltered=[],reservationsLoaded=false,allGoogleReviews=[],googleFiltered=[],googleLoaded=false;
-let bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,overview:[],selectedProperty:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:'',overviewSetupRequired:false,overviewSetupMessage:''};
+let bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,overview:[],selectedProperty:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:'',overviewSetupRequired:false,overviewSetupMessage:'',translationConfigured:false,pendingTranslations:0};
 const AVC=['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#f87171'];
 
 function readAuthSession(){try{return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)||'null');}catch(e){return null;}}
@@ -1258,7 +1260,7 @@ function resetDashboardState(){
   allGoogleReviews=[];
   googleFiltered=[];
   googleLoaded=false;
-  bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,overview:[],selectedProperty:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:'',overviewSetupRequired:false,overviewSetupMessage:''};
+  bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,overview:[],selectedProperty:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:'',overviewSetupRequired:false,overviewSetupMessage:'',translationConfigured:false,pendingTranslations:0};
   deletingReviewIds=new Set();
   if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null;}
   if(document.getElementById('property-form'))resetPropertyForm();
@@ -1310,6 +1312,14 @@ function bookingDisplayRating5(score10){
   const value=Number(score10);
   if(!Number.isFinite(value))return null;
   return Math.max(0.5,Math.min(5,Number((value/2).toFixed(2))));
+}
+function applyBookingTranslationStatus({configured=false,value='—',sub='Configura la API key para traducir a español',pill='Traducción opcional'}={}){
+  const valueEl=document.getElementById('booking-translation-status');
+  const subEl=document.getElementById('booking-translation-sub');
+  const pillEl=document.getElementById('booking-translate-pill');
+  if(valueEl)valueEl.textContent=value;
+  if(subEl)subEl.textContent=sub;
+  if(pillEl)pillEl.textContent=pill;
 }
 async function fileToBase64(file){
   const buffer=await file.arrayBuffer();
@@ -1469,6 +1479,7 @@ function renderBookingWorkspaceChrome(){
   const fileInput=document.getElementById('booking-file');
   const previewBtn=document.getElementById('booking-preview-btn');
   const importBtn=document.getElementById('booking-import-btn');
+  const translateBtn=document.getElementById('booking-translate-btn');
   const openCommentsBtn=document.getElementById('booking-open-comments-btn');
   const configCommentsBtn=document.getElementById('booking-config-comments-btn');
   if(document.getElementById('booking-prop'))document.getElementById('booking-prop').value=bookingState.propertyId||'';
@@ -1478,6 +1489,10 @@ function renderBookingWorkspaceChrome(){
     if(fileInput)fileInput.disabled=true;
     if(previewBtn)previewBtn.disabled=true;
     if(importBtn)importBtn.disabled=true;
+    if(translateBtn){
+      translateBtn.disabled=true;
+      translateBtn.textContent='Traducir pendientes';
+    }
     if(openCommentsBtn){
       openCommentsBtn.disabled=true;
       openCommentsBtn.textContent='Ver comentarios ↗';
@@ -1496,6 +1511,18 @@ function renderBookingWorkspaceChrome(){
   }
   if(fileInput)fileInput.disabled=false;
   if(previewBtn&&previewBtn.textContent==='Analizar CSV')previewBtn.disabled=false;
+  if(translateBtn){
+    if(!bookingState.translationConfigured){
+      translateBtn.disabled=true;
+      translateBtn.textContent='Falta Google Translate';
+    }else if((bookingState.pendingTranslations||0)>0){
+      translateBtn.disabled=false;
+      translateBtn.textContent=`Traducir pendientes (${bookingState.pendingTranslations})`;
+    }else{
+      translateBtn.disabled=true;
+      translateBtn.textContent='Todo traducido';
+    }
+  }
   if(openCommentsBtn){
     openCommentsBtn.disabled=!bookingUrl;
     openCommentsBtn.textContent=bookingUrl?'Ver comentarios ↗':'Link pendiente';
@@ -1583,9 +1610,7 @@ function renderBookingPreview(){
     subEl.textContent='Aún no se analiza ningún archivo';
     panel.innerHTML='<div class="empty"><div class="ei">📄</div>Sube un CSV y usa “Analizar CSV” para revisar nuevas, duplicadas y errores antes de importar.</div>';
     importBtn.disabled=true;
-    translateValue.textContent='—';
-    translateSub.textContent='Configura la API key para traducir a español';
-    if(translatePill)translatePill.textContent='Traducción opcional';
+    applyBookingTranslationStatus();
     renderBookingWorkspaceChrome();
     return;
   }
@@ -1600,9 +1625,12 @@ function renderBookingPreview(){
   totalEl.textContent=s.rowsNew??'—';
   subEl.textContent=`${s.filename||'booking.csv'} · ${(s.rowsTotal||0)} filas detectadas`;
   status.textContent=`${s.rowsNew||0} nuevas · ${s.rowsDuplicateExisting||0} ya existían · ${s.rowsOutOfScope||0} fuera de rango · ${s.rowsInvalid||0} inválidas`;
-  translateValue.textContent=s.translationConfigured?'Activa':'Inactiva';
-  translateSub.textContent=s.translationConfigured?'Se traducirá a español al importar':'Importará sin traducción automática';
-  if(translatePill)translatePill.textContent=s.translationConfigured?'Traducción activa':'Sin traducción automática';
+  applyBookingTranslationStatus({
+    configured:Boolean(s.translationConfigured),
+    value:s.translationConfigured?'Activa':'Inactiva',
+    sub:s.translationConfigured?'Se traducirá a español al importar':'Configura GOOGLE_TRANSLATE_API_KEY para traducir al importar',
+    pill:s.translationConfigured?'Traducción activa':'Sin traducción automática'
+  });
   importBtn.disabled=!(s.rowsNew>0);
   document.getElementById('booking-file-meta').textContent=`Propiedad: ${s.property?.name||'—'} · Solo se tomarán reviews desde ${s.minReviewYear||2025} · ${s.monthsDetected?.length?`Meses detectados: ${s.monthsDetected.map(formatMonthKey).join(', ')}`:'Sin meses detectados'}`;
   panel.innerHTML=`<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px">${chips.map(chip=>`<div class="scard" style="min-height:unset;padding:14px"><div class="slabel">${chip.label}</div><div class="sval" style="color:${chip.color}">${chip.value}</div></div>`).join('')}</div>
@@ -1626,6 +1654,23 @@ function renderBookingDashboardData(){
   document.getElementById('booking-avg5').textContent=summary?.avgGeneral5!=null?summary.avgGeneral5.toFixed(2):'—';
   document.getElementById('booking-translated').textContent=summary?.translatedReviews!=null?String(summary.translatedReviews):'—';
   document.getElementById('booking-total').textContent=summary?.totalReviews!=null?String(summary.totalReviews):'—';
+  applyBookingTranslationStatus(
+    !bookingState.translationConfigured
+      ? {
+          configured:false,
+          value:'Inactiva',
+          sub:'Configura GOOGLE_TRANSLATE_API_KEY en Netlify para traducir nuevas y pendientes',
+          pill:'Sin traducción automática'
+        }
+      : {
+          configured:true,
+          value:(bookingState.pendingTranslations||0)>0?String(bookingState.pendingTranslations):'Activa',
+          sub:(bookingState.pendingTranslations||0)>0
+            ? `Hay ${bookingState.pendingTranslations} review(s) pendientes en el filtro actual`
+            : 'No hay reviews pendientes por traducir en el filtro actual',
+          pill:(bookingState.pendingTranslations||0)>0?'Traducción pendiente':'Traducción activa'
+        }
+  );
   const monthlyEl=document.getElementById('booking-monthly');
   if(!monthly.length)monthlyEl.innerHTML=`<div class="empty"><div class="ei">📈</div>${escapeHtml(setupRequired?setupMessage:'Sin datos para este filtro')}</div>`;
   else monthlyEl.innerHTML=`<div style="overflow-x:auto"><table class="rtable"><thead><tr><th>Mes</th><th>Reviews</th><th>Prom. 10</th><th>Prom. 5</th><th>Staff</th><th>Limpieza</th><th>Ubicación</th></tr></thead><tbody>${[...monthly].sort((a,b)=>b.month.localeCompare(a.month)).map(row=>`<tr><td>${escapeHtml(formatMonthKey(row.month))}</td><td>${row.count}</td><td><span style="color:${scoreBadgeColor(row.avgOverall10)};font-weight:700">${row.avgOverall10?.toFixed(2)||'—'}</span></td><td>${row.avgGeneral5?.toFixed(2)||'—'}★</td><td>${row.avgStaff?.toFixed(2)||'—'}</td><td>${row.avgCleanliness?.toFixed(2)||'—'}</td><td>${row.avgLocation?.toFixed(2)||'—'}</td></tr>`).join('')}</tbody></table></div>`;
@@ -1670,6 +1715,8 @@ async function loadBookingDashboard(){
     bookingState.setupMessage=data.setupMessage||'';
     bookingState.overviewSetupRequired=Boolean(data.overviewSetupRequired);
     bookingState.overviewSetupMessage=data.overviewSetupMessage||'';
+    bookingState.translationConfigured=Boolean(data.translationConfigured);
+    bookingState.pendingTranslations=Number(data.pendingTranslations)||0;
     syncBookingYearFilter(bookingState.availableYears);
     if(document.getElementById('booking-month'))document.getElementById('booking-month').value=bookingState.month||'';
     if(document.getElementById('booking-prop'))document.getElementById('booking-prop').value=bookingState.propertyId;
@@ -1677,6 +1724,8 @@ async function loadBookingDashboard(){
   }catch(e){
     console.error(e);
     bookingState.overview=[];
+    bookingState.translationConfigured=false;
+    bookingState.pendingTranslations=0;
     document.getElementById('booking-sub').textContent='Error al cargar Booking';
     document.getElementById('booking-overview-sub').textContent='No se pudo cargar Booking';
     document.getElementById('booking-properties-grid').innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="ei">❌</div>${escapeHtml(e.message)}</div>`;
@@ -1762,6 +1811,26 @@ async function importBookingCsv(){
   }finally{
     btn.disabled=!(bookingState.preview?.summary?.rowsNew>0);
     btn.textContent='Importar nuevas';
+  }
+}
+async function translateBookingReviews(){
+  const propertyId=document.getElementById('booking-prop')?.value||bookingState.propertyId||'';
+  if(!propertyId){notify('⚠️','Selecciona una propiedad antes de traducir');return;}
+  if(!bookingState.translationConfigured){notify('⚠️','Configura GOOGLE_TRANSLATE_API_KEY en Netlify para traducir Booking');return;}
+  if((bookingState.pendingTranslations||0)<=0){notify('ℹ️','No hay reviews pendientes por traducir en este filtro');return;}
+  const btn=document.getElementById('booking-translate-btn');
+  btn.disabled=true;
+  btn.textContent='Traduciendo...';
+  try{
+    const data=await apiRequest(API_BOOKING_TRANSLATE,{method:'POST',body:{propertyId,year:bookingState.year||'',month:bookingState.month||''}});
+    const summary=data.summary||{};
+    notify('🌐',`Booking traducido: ${summary.translatedRows||0} traducidas · ${summary.unchangedRows||0} sin cambio`);
+    await loadAll();
+    await loadBookingDashboard();
+  }catch(e){
+    console.error(e);
+    notify('❌',`No se pudo traducir Booking: ${e.message}`);
+    renderBookingWorkspaceChrome();
   }
 }
 function setPropertyCreateBusy(isBusy){
