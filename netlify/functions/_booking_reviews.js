@@ -10,6 +10,7 @@ const BOOKING_CONNECTOR = 'booking';
 const BOOKING_CHANNEL = 'booking';
 const BOOKING_SOURCE_TYPE = 'booking_csv';
 const BOOKING_SETUP_MIGRATION = '20260428_booking_csv_ingestion.sql';
+const BOOKING_MIN_REVIEW_YEAR = 2025;
 const GOOGLE_TRANSLATE_ENDPOINT = 'https://translation.googleapis.com/language/translate/v2';
 const MAX_TRANSLATE_BATCH_SIZE = 64;
 const BOOKING_REVIEW_LINKS = [
@@ -338,6 +339,11 @@ function scoreToGeneralRating(score10) {
   return Math.max(1, Math.min(5, Math.round(score10 / 2)));
 }
 
+function scoreToDisplayRating5(score10) {
+  if (!Number.isFinite(score10)) return null;
+  return Number((Math.max(0.5, Math.min(5, score10 / 2))).toFixed(2));
+}
+
 function buildAverageScore(row) {
   const values = AREA_FIELDS.map((field) => row[field.key]).filter((value) => Number.isFinite(value));
   if (!values.length) return null;
@@ -377,6 +383,30 @@ function parseReviewDate(value) {
   const parsed = new Date(raw);
   if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
   return null;
+}
+
+function isBookingReviewInScope(reviewDateIso) {
+  const year = Number.parseInt(String(reviewDateIso || '').slice(0, 4), 10);
+  return Number.isFinite(year) && year >= BOOKING_MIN_REVIEW_YEAR;
+}
+
+function sortPreviewRows(rows = []) {
+  const priority = {
+    parsed: 0,
+    duplicate_existing: 1,
+    duplicate_in_file: 2,
+    invalid: 3,
+    out_of_scope: 4,
+  };
+  return rows.slice().sort((left, right) => {
+    const leftPriority = priority[left?.status] ?? 99;
+    const rightPriority = priority[right?.status] ?? 99;
+    if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+    const leftDate = String(left?.reviewDateIso || '');
+    const rightDate = String(right?.reviewDateIso || '');
+    if (leftDate !== rightDate) return rightDate.localeCompare(leftDate);
+    return Number(left?.rowNumber || 0) - Number(right?.rowNumber || 0);
+  });
 }
 
 function buildBookingReviewKey({ propertyId, reviewDateIso, guestName, reservationNumber }) {
@@ -624,6 +654,9 @@ function parseBookingCsv({ propertyId, filename, csvBase64 }) {
     if (!guestName) issues.push('guest_name_vacio');
     if (!reservationNumber) issues.push('reservation_number_vacio');
     if (!Number.isFinite(ratingOverall10)) issues.push('review_score_invalido');
+    if (!issues.length && !isBookingReviewInScope(reviewDateIso)) {
+      issues.push('review_date_fuera_de_rango');
+    }
 
     const bookingReviewKey =
       reviewDateIso && guestName && reservationNumber
@@ -660,7 +693,11 @@ function parseBookingCsv({ propertyId, filename, csvBase64 }) {
       combinedComment: buildCombinedComment({ reviewTitle, positiveReview, negativeReview }),
       scoreAverage10: null,
       issues,
-      status: issues.length ? 'invalid' : 'parsed',
+      status: issues.includes('review_date_fuera_de_rango')
+        ? 'out_of_scope'
+        : issues.length
+          ? 'invalid'
+          : 'parsed',
       rawCsv: {
         review_date: getCell(cells, headerMap, 'review_date'),
         guest_name: getCell(cells, headerMap, 'guest_name'),
@@ -693,7 +730,7 @@ function parseBookingCsv({ propertyId, filename, csvBase64 }) {
 
   const seenKeys = new Set();
   parsedRows.forEach((row) => {
-    if (row.status === 'invalid' || !row.bookingReviewKey) return;
+    if (row.status !== 'parsed' || !row.bookingReviewKey) return;
     if (seenKeys.has(row.bookingReviewKey)) {
       row.status = 'duplicate_in_file';
       row.issues.push('duplicada_en_archivo');
@@ -740,14 +777,16 @@ async function buildPreview({ propertyId, filename, csvBase64 }) {
     rowsNew: parsedRows.filter((row) => row.status === 'parsed').length,
     rowsDuplicateExisting: parsedRows.filter((row) => row.status === 'duplicate_existing').length,
     rowsDuplicateInFile: parsedRows.filter((row) => row.status === 'duplicate_in_file').length,
+    rowsOutOfScope: parsedRows.filter((row) => row.status === 'out_of_scope').length,
     rowsInvalid: parsedRows.filter((row) => row.status === 'invalid').length,
     monthsDetected: [...new Set(validRows.map((row) => monthKeyFromIso(row.reviewDateIso)).filter(Boolean))].sort(),
     translationConfigured: Boolean(process.env.GOOGLE_TRANSLATE_API_KEY),
+    minReviewYear: BOOKING_MIN_REVIEW_YEAR,
   };
 
   return {
     summary,
-    sampleRows: parsedRows.slice(0, 10).map((row) => ({
+    sampleRows: sortPreviewRows(parsedRows).slice(0, 10).map((row) => ({
       rowNumber: row.rowNumber,
       status: row.status,
       issues: row.issues,
@@ -1017,17 +1056,18 @@ async function importBookingCsv({ propertyId, filename, csvBase64, uploadedBy })
       property_id: propertyId,
       source_filename: filename || 'booking.csv',
       uploaded_by: normalizeText(uploadedBy) || null,
-      rows_detected: parsedRows.length,
-      rows_new: rowsToInsert.length,
-      rows_duplicate_existing: parsedRows.filter((row) => row.status === 'duplicate_existing').length,
-      rows_duplicate_in_file: parsedRows.filter((row) => row.status === 'duplicate_in_file').length,
-      rows_invalid: parsedRows.filter((row) => row.status === 'invalid').length,
+    rows_detected: parsedRows.length,
+    rows_new: rowsToInsert.length,
+    rows_duplicate_existing: parsedRows.filter((row) => row.status === 'duplicate_existing').length,
+    rows_duplicate_in_file: parsedRows.filter((row) => row.status === 'duplicate_in_file').length,
+    rows_invalid: parsedRows.filter((row) => row.status === 'invalid').length,
       rows_translated: translationResult.translatedRows,
       review_date_from: reviewDateValues[0] || null,
       review_date_to: reviewDateValues[reviewDateValues.length - 1] || null,
       status: 'processing',
       metadata: {
         translationConfigured: translationResult.translationConfigured,
+        rowsOutOfScope: parsedRows.filter((row) => row.status === 'out_of_scope').length,
       },
     });
   } catch (error) {
@@ -1142,6 +1182,7 @@ async function importBookingCsv({ propertyId, filename, csvBase64, uploadedBy })
       rowsImported: rowsToInsert.length,
       rowsDuplicateExisting: parsedRows.filter((row) => row.status === 'duplicate_existing').length,
       rowsDuplicateInFile: parsedRows.filter((row) => row.status === 'duplicate_in_file').length,
+      rowsOutOfScope: parsedRows.filter((row) => row.status === 'out_of_scope').length,
       rowsInvalid: parsedRows.filter((row) => row.status === 'invalid').length,
       rowsTranslated: translationResult.translatedRows,
       importBatchId,
@@ -1157,10 +1198,11 @@ function average(values = []) {
 }
 
 function aggregateBookingRows(rows = []) {
+  const avgOverall10 = average(rows.map((row) => Number(row.rating_overall_10)));
   const summary = {
     totalReviews: rows.length,
-    avgOverall10: average(rows.map((row) => Number(row.rating_overall_10))),
-    avgGeneral5: average(rows.map((row) => Number(row.rating_general_5))),
+    avgOverall10,
+    avgGeneral5: scoreToDisplayRating5(avgOverall10),
     avgScoreAverage10: average(rows.map((row) => Number(row.score_average_10))),
     translatedReviews: rows.filter((row) => row.translation_status === 'translated').length,
   };
@@ -1179,7 +1221,9 @@ function aggregateBookingRows(rows = []) {
       month,
       count: items.length,
       avgOverall10: average(items.map((item) => Number(item.rating_overall_10))),
-      avgGeneral5: average(items.map((item) => Number(item.rating_general_5))),
+      avgGeneral5: scoreToDisplayRating5(
+        average(items.map((item) => Number(item.rating_overall_10)))
+      ),
       avgStaff: average(items.map((item) => Number(item.score_staff))),
       avgCleanliness: average(items.map((item) => Number(item.score_cleanliness))),
       avgLocation: average(items.map((item) => Number(item.score_location))),
@@ -1338,8 +1382,9 @@ async function loadBookingDashboard({ propertyId, year, month }) {
   const reviewRows = await reviewsRes.json();
   const importBatches = await batchesRes.json();
 
-  const availableYears = [...new Set(reviewRows.map((row) => String(row.review_date || '').slice(0, 4)).filter(Boolean))].sort();
-  const filteredRows = reviewRows.filter((row) => {
+  const scopedRows = reviewRows.filter((row) => isBookingReviewInScope(row.review_date));
+  const availableYears = [...new Set(scopedRows.map((row) => String(row.review_date || '').slice(0, 4)).filter(Boolean))].sort();
+  const filteredRows = scopedRows.filter((row) => {
     const iso = String(row.review_date || '');
     if (year && iso.slice(0, 4) !== String(year)) return false;
     if (month && iso.slice(5, 7) !== String(month).padStart(2, '0')) return false;
