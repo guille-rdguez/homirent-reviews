@@ -943,6 +943,7 @@ body.auth-ready .auth-screen { display:none; }
         <button class="btn btn-primary btn-sm" id="google-manage-btn" onclick="openGoogleReviewManager()">Responder más reviews ↗</button>
       </div>
     </div>
+    <div id="gsummarycards" class="g3" style="margin-top:14px"></div>
     <div id="gcards" style="margin-top:14px;display:flex;flex-direction:column;gap:12px"></div>
   </div>
 
@@ -1202,6 +1203,7 @@ const API_BOOKING_TRANSLATE='/api/dashboard-booking-translate';
 const API_RESET_INBOUND='/api/internal/reset-inbound-matched';
 const API_REPROCESS_BATCH='/api/internal/reprocess-inbound-batch';
 const BOOKING_LINK_OVERRIDE_STORAGE_KEY='booking_review_url_overrides_v1';
+const GOOGLE_MANAGER_AUTHUSER='reservas@homirent.com';
 const GOOGLE_REVIEW_MANAGER_LINKS=[
   {name:'Morelos',url:'https://www.google.com/search?q=Morelos+by+Homi+rent&stick=H4sIAAAAAAAA_-NgU1I1qLAwTTE2TUo1SjVJTk42TjS2MqiwTEsxTDRMTEs2tDA3NjAxWMQq4ptflJqTX6yQVKngkZ-bqVCUmlcCAGKCsT9AAAAA&hl=es-419&mat=CbX8XZr-9nxTElcBTVDHnvPfk3wcvdO44mfb2DHo_KzQD20QGcyGKmXLlg3hwtvPqKCxp-WsZ9K45DgCwTmheR86JXjRcrM9x-yUjxXKjzNVCkO9rohxi1CgYKPpisEDzhc&authuser=7#mpd=~6015954775632116917/customers/reviews'},
   {name:'Prosperidad',url:'https://www.google.com/search?q=Prosperidad+by+Homi+Rent&stick=H4sIAAAAAAAA_-NgU1I1qLAwTTFMAwLLROMkS1NzcyuDCkujJFOLpBRLCxOT5EQjw9RFrBIBRfnFBalFmSmJKQpJlQoe-bmZCkGpeSUAILj-xkQAAAA&hl=es-419&mat=Cd9gdDFeQ_yNElcBTVDHnsXSNgsjoKOkUjx8OXK1ggf3kNuufsXVfjUyta7AUigdGglwUiYio4QVABtxG2s8g0pF2CVIj_zPWQDuVgSZ0e0_Vx8m28R9XB8XXkLjCwOkIug&authuser=7#mpd=~10231126525314621663/customers/reviews'},
@@ -2326,19 +2328,29 @@ function findGoogleManagerLink(name=''){
   return fuzzy?.url||'';
 }
 
+function setGoogleManageAuth(url=''){
+  try{
+    const parsed=new URL(url,window.location.origin);
+    parsed.searchParams.set('authuser',GOOGLE_MANAGER_AUTHUSER);
+    return parsed.toString();
+  }catch(e){
+    return url;
+  }
+}
+
 function buildGoogleManageUrl({name='',city=''}={}){
   const direct=findGoogleManagerLink(name);
-  if(direct)return direct;
+  if(direct)return setGoogleManageAuth(direct);
   const query=[normalizeSpaces(name),normalizeSpaces(city)].filter(Boolean).join(' ').trim();
-  if(!query)return 'https://www.google.com/search?q=my+business&authuser=reservas%40homirent.com';
-  return `https://www.google.com/search?q=${encodeURIComponent(query)}&authuser=reservas%40homirent.com`;
+  if(!query)return setGoogleManageAuth('https://www.google.com/search?q=my+business');
+  return setGoogleManageAuth(`https://www.google.com/search?q=${encodeURIComponent(query)}`);
 }
 
 function syncGoogleManageButton(){
   const btn=document.getElementById('google-manage-btn');
   if(!btn)return;
   const property=getSelectedGoogleProperty();
-  btn.textContent=property?'Abrir perfil en Google ↗':'Responder más reviews ↗';
+  btn.textContent=property?'Abrir perfil con reservas@homirent.com ↗':'Responder más reviews ↗';
 }
 
 function openGoogleReviewManager(){
@@ -2348,6 +2360,50 @@ function openGoogleReviewManager(){
     city:property?.city||'',
   });
   window.open(url,'_blank','noopener');
+}
+
+function renderGoogleSummaryCards(){
+  const el=document.getElementById('gsummarycards');
+  if(!el)return;
+  if(!googleFiltered.length){
+    el.innerHTML='';
+    return;
+  }
+  const grouped=new Map();
+  googleFiltered.forEach(review=>{
+    const key=review.property_id||review.properties?.name||'unknown';
+    if(!grouped.has(key)){
+      grouped.set(key,{
+        propertyId:review.property_id||'',
+        name:textOr(review.properties?.name,'Sin complejo'),
+        city:textOr(review.properties?.city,''),
+        ratings:[],
+        pending:0,
+        count:0,
+      });
+    }
+    const item=grouped.get(key);
+    const rating=Number(review.rating);
+    if(Number.isFinite(rating))item.ratings.push(rating);
+    if(!review.responded)item.pending+=1;
+    item.count+=1;
+  });
+  const cards=[...grouped.values()]
+    .map(item=>({
+      ...item,
+      avg:item.ratings.length?item.ratings.reduce((sum,value)=>sum+value,0)/item.ratings.length:null,
+    }))
+    .sort((a,b)=>{
+      const left=Number.isFinite(a.avg)?a.avg:-1;
+      const right=Number.isFinite(b.avg)?b.avg:-1;
+      if(right!==left)return right-left;
+      return a.name.localeCompare(b.name,'es',{sensitivity:'base'});
+    });
+  el.innerHTML=cards.map(item=>`<div class="scard" style="min-height:unset;border-top:3px solid ${scoreBadgeColor(item.avg)}">
+    <div class="slabel">${escapeHtml(item.name)}</div>
+    <div class="sval" style="color:${scoreBadgeColor(item.avg)}">${item.avg!=null?item.avg.toFixed(2):'—'}</div>
+    <div class="ssub">${safeText(item.city,'Sin ciudad')} · ${item.count} review${item.count===1?'':'s'} · ${item.pending} pendiente${item.pending===1?'':'s'}</div>
+  </div>`).join('');
 }
 
 function applyGoogleFilters(){
@@ -2360,6 +2416,7 @@ function applyGoogleFilters(){
     return true;
   });
   syncGoogleManageButton();
+  renderGoogleSummaryCards();
   renderGoogleReviews();
 }
 
