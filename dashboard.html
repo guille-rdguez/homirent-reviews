@@ -1202,6 +1202,16 @@ const API_BOOKING_TRANSLATE='/api/dashboard-booking-translate';
 const API_RESET_INBOUND='/api/internal/reset-inbound-matched';
 const API_REPROCESS_BATCH='/api/internal/reprocess-inbound-batch';
 const BOOKING_LINK_OVERRIDE_STORAGE_KEY='booking_review_url_overrides_v1';
+const GOOGLE_REVIEW_MANAGER_LINKS=[
+  {name:'Morelos',url:'https://www.google.com/search?q=Morelos+by+Homi+rent&stick=H4sIAAAAAAAA_-NgU1I1qLAwTTE2TUo1SjVJTk42TjS2MqiwTEsxTDRMTEs2tDA3NjAxWMQq4ptflJqTX6yQVKngkZ-bqVCUmlcCAGKCsT9AAAAA&hl=es-419&mat=CbX8XZr-9nxTElcBTVDHnvPfk3wcvdO44mfb2DHo_KzQD20QGcyGKmXLlg3hwtvPqKCxp-WsZ9K45DgCwTmheR86JXjRcrM9x-yUjxXKjzNVCkO9rohxi1CgYKPpisEDzhc&authuser=7#mpd=~6015954775632116917/customers/reviews'},
+  {name:'Prosperidad',url:'https://www.google.com/search?q=Prosperidad+by+Homi+Rent&stick=H4sIAAAAAAAA_-NgU1I1qLAwTTFMAwLLROMkS1NzcyuDCkujJFOLpBRLCxOT5EQjw9RFrBIBRfnFBalFmSmJKQpJlQoe-bmZCkGpeSUAILj-xkQAAAA&hl=es-419&mat=Cd9gdDFeQ_yNElcBTVDHnsXSNgsjoKOkUjx8OXK1ggf3kNuufsXVfjUyta7AUigdGglwUiYio4QVABtxG2s8g0pF2CVIj_zPWQDuVgSZ0e0_Vx8m28R9XB8XXkLjCwOkIug&authuser=7#mpd=~10231126525314621663/customers/reviews'},
+  {name:'Suites Reforma',url:'https://www.google.com/search?q=Suites+Reforma+by+HomiRent&stick=H4sIAAAAAAAA_-NgU1I1qLBIMzUzNzY3TzOzSDFLTDO3MqgwSUuyNDQySE1NTko0TDS3XMQqFVyaWZJarBCUmpZflJuokFSp4JGfmxmUmlcCAKd0PolGAAAA&hl=es-419&mat=CSM-s2g6L68FElcBTVDHnjUwOsl4xPXsebHXLCAExbtLdnskR0uEu5WCqo3Z9PHMOYxHCMHA5n0nZFEyASONIR9ZID3-Jz2BJF1FeLOP_lgUNFIfmJ3eCniY_ISBr9Nl5a0&authuser=7#mpd=~409598019025190435/customers/reviews'},
+  {name:'Hacienda Santa Bárbara',url:'https://www.google.com/search?q=Hacienda+Santa+Barbara+By+Homirent&stick=H4sIAAAAAAAA_-NgU1I1qLAwTTE2MTVOMTdMMUgzSkqxMqhINUpNNDUzSktLNjQwTzYwXcSq5JGYnJmal5KoEJyYV5Ko4JRYlJRYBKQrFTzyczOLUvNKAO2ErtVOAAAA&hl=es-419&mat=CTevBN4v2c9YElcBTVDHnqQItvwAz_pGUj3cxpLvyxGeV9JKcdeF0oPCJrLrOxXtOAhmT86qoOrOLjYzpdS-zWEZZzszeDB-hsX2fkJS6AFWT1sMegzctu69d5eJvQPBVC4&authuser=7#mpd=~6399572395128303415/customers/reviews'},
+  {name:'Ezequiel Montes',url:'https://www.google.com/search?q=Ezequiel+Montes+By+Homirent&stick=H4sIAAAAAAAA_-NgU1I1qLAwTTE2MbVITEtKNjW2SDa0MqhINk1LNjc0sjSyTDFMM0tKXcQq7VqVWliamZqj4JufV5JarOBUqeCRn5tZlJpXAgDshypeRwAAAA&hl=es-419&mat=CeTO_1fnoUBtElcBTVDHnnkL9wacoFEnblFJ54xMwgGE4Lmuzf_RDq4dJuaJ3gbbChCcdhLiSx-fZ4kIwcB03ynj6zvti5BT92hI1ZvRoCSuOiYll03d-F3cMGe2y6HcF1Y&authuser=7#mpd=~7872470163629526756/customers/reviews'},
+  {name:'Suites Álamos',url:'https://www.google.com/search?q=Suites+%C3%81lamos+by+Homirent&stick=H4sIAAAAAAAA_-NgU1I1qLAwTTE2TUpOtkw2MjdMTDW3MqgwSbYwSrEwMjMwM0pKNjFKXMQqFVyaWZJarHC4MScxN79YIalSwSM_N7MoNa8EALH3SF5GAAAA&hl=es-419&mat=CSmMWs0vgpvmElcBTVDHnuLd4p63lVsgmsXn54yasJr5Tti48672NK2qzq1SMEfS2ERk3IOyEiljo-f9v-a72M8IAWDW815WLPCXbFQFH2Oh2O1aHDS2VCukYuHdsuOXAes&authuser=7#mpd=~16617018391933914153/customers/reviews'},
+  {name:'Universidad',url:'https://www.google.com/search?q=Universidad+By+HomiRent&stick=H4sIAAAAAAAA_-NgU1I1qLAwTTE2TTI0MDO1NDYyMTW2MqhItjRLNkw2ME9JSzEySTRKW8QqHpqXWZZaVJyZkpii4FSp4JGfmxmUmlcCAL0VrlpDAAAA&hl=es-419&mat=CTjea1GfnxOqElcBTVDHnkPnaPhl1O8qszT1pZIbmGRP1lIUWOEc7B2QDyJGlrtOX0olTvpFyn5dlfAFYKLrf5tAiAjYHv0G64bxECUrs7m30-mtEGhC0ObwB1DKzJsags8&authuser=7#mpd=~12255314517619891768/customers/reviews'},
+  {name:'Allende',url:'https://www.google.com/search?q=Allende+by+Homi+Rent&stick=H4sIAAAAAAAA_-NgU1I1qLAwTTE2TbI0MDNMNTJINEuzMqhIMkhNsUwzNUtMSTU0NzdLXsQq4piTk5qXkqqQVKngkZ-bqRCUmlcCAEWT6DtAAAAA&hl=es-419&mat=CW7TKZIPT01zElcBTVDHns4YPrqYcB0CWhe7BzGB_E7CsKER_bISy1-Swk_Snlq_2yRWYbFdSAz7Dj3azEfVruIwHwC3MfCW6y_RiCDyD9Xevrc_VcLgaeX52FjsdcxzaGw&authuser=7#mpd=~8308383815863751534/customers/reviews'},
+];
 let allReviews=[],filtered=[],allProps=[],propMap={},dateFrom=null,dateTo=null,authReady=false,refreshTimer=null,activeQrPropertyId='',tableRows=[],deletingReviewIds=new Set(),creatingProperty=false,allReservations=[],resFiltered=[],reservationsLoaded=false,allGoogleReviews=[],googleFiltered=[],googleLoaded=false;
 let bookingState={loaded:false,loading:false,propertyId:'',year:'',month:'',availableYears:[],preview:null,upload:null,overview:[],selectedProperty:null,summary:null,monthly:[],areaSummary:[],recentReviews:[],importBatches:[],setupRequired:false,setupMessage:'',overviewSetupRequired:false,overviewSetupMessage:'',translationConfigured:false,pendingTranslations:0};
 const AVC=['#4ade80','#60a5fa','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#f87171'];
@@ -2304,7 +2314,21 @@ function getSelectedGoogleProperty(){
   return null;
 }
 
+function findGoogleManagerLink(name=''){
+  const key=normalizedKey(name);
+  if(!key)return '';
+  const exact=GOOGLE_REVIEW_MANAGER_LINKS.find(item=>normalizedKey(item.name)===key);
+  if(exact?.url)return exact.url;
+  const fuzzy=GOOGLE_REVIEW_MANAGER_LINKS.find(item=>{
+    const candidate=normalizedKey(item.name);
+    return candidate&&((candidate.includes(key)&&key.length>=4)||(key.includes(candidate)&&candidate.length>=4));
+  });
+  return fuzzy?.url||'';
+}
+
 function buildGoogleManageUrl({name='',city=''}={}){
+  const direct=findGoogleManagerLink(name);
+  if(direct)return direct;
   const query=[normalizeSpaces(name),normalizeSpaces(city)].filter(Boolean).join(' ').trim();
   if(!query)return 'https://www.google.com/search?q=my+business&authuser=reservas%40homirent.com';
   return `https://www.google.com/search?q=${encodeURIComponent(query)}&authuser=reservas%40homirent.com`;
