@@ -2202,10 +2202,58 @@ function renderDist(reviews){
   document.getElementById('rdist').innerHTML=[5,4,3,2,1].map(s=>{const n=counts[s-1],pct=Math.round(n/max*100);return `<div class="brow"><span class="blbl">${s}★</span><div class="btrack"><div class="bfill" style="width:${pct}%;background:${rc(s)}"></div></div><span class="bcnt">${n}</span></div>`;}).join('');
 }
 
+function reviewExternalUrl(review){
+  return normalizeSpaces(review?.raw_payload?.parsed_fields?.reviewUrl||'');
+}
+
+function reviewSourceLabel(review){
+  return CHAN_LABEL[review?.channel]||textOr(review?.source,'Otro');
+}
+
+function reviewSourceBadge(review){
+  const channel=review?.channel||'unknown';
+  const colorMap={expedia:'#b8860b',booking:'#003580',airbnb:'#ff385c',direct:'#2d9e6b',google:'#4285f4',unknown:'#64748b'};
+  const bg=colorMap[channel]||'#64748b';
+  return `<span style="font-size:10px;font-weight:700;color:#fff;background:${bg};border-radius:999px;padding:3px 8px;letter-spacing:0.03em">${escapeHtml(reviewSourceLabel(review))}</span>`;
+}
+
+function reviewViewLabel(review){
+  const channel=review?.channel||'unknown';
+  if(channel==='expedia')return 'Ver en Expedia ↗';
+  if(channel==='booking')return 'Ver en Booking ↗';
+  if(channel==='airbnb')return 'Ver en Airbnb ↗';
+  if(channel==='google')return 'Ver en Google ↗';
+  return 'Ver review ↗';
+}
+
 function renderAlerts(reviews){
   const alerts=reviews.filter(r=>r.rating<=2).slice(0,6);const c=document.getElementById('ralerts');
   if(!alerts.length){c.innerHTML='<div style="font-size:12px;color:var(--text3)">✅ Sin alertas en este periodo</div>';return;}
-  c.innerHTML=alerts.map(r=>`<div style="display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid var(--border)"><span class="abadge">⚠ ${r.rating}★</span><span style="font-size:12px;flex:1;color:var(--text2)">${safeText(r.guest_name,'Anónimo')} · ${safeText(r.room_name)} · ${safeText(r.properties?.name)}</span><span style="font-size:10px;color:var(--text3)">${timeAgo(r.created_at)}</span></div>`).join('');
+  c.innerHTML=alerts.map(r=>{
+    const detail=[safeText(r.room_name,''),safeText(r.properties?.name,'—')].filter(Boolean).join(' · ');
+    const comment=safeText(r.comment,'Sin comentario');
+    const reviewUrl=reviewExternalUrl(r);
+    const viewBtn=reviewUrl
+      ? `<a href="${escapeHtml(reviewUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="text-decoration:none;white-space:nowrap">${reviewViewLabel(r)}</a>`
+      : `<span class="tag" style="white-space:nowrap">Sin link directo</span>`;
+    return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0">
+        <span class="abadge">⚠ ${r.rating}★</span>
+        <div style="min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:700;color:var(--text)">${safeText(r.guest_name,'Anónimo')}</span>
+            ${reviewSourceBadge(r)}
+          </div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">${detail||'Sin detalle de habitación'}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px;line-height:1.5">${comment}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+        ${viewBtn}
+        <span style="font-size:10px;color:var(--text3)">${timeAgo(r.created_at)}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderPerf(reviews){
