@@ -1318,6 +1318,7 @@ function safeJsArg(v){return escapeHtml(JSON.stringify(textOr(v,'')));}
 function normalizeSpaces(v){return String(v??'').trim().replace(/\s+/g,' ');}
 function normalizedKey(v){return normalizeSpaces(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
 function scoreBadgeColor(score){if(score===null||score===undefined||score==='')return 'var(--text3)';if(score>=9)return 'var(--green-acc)';if(score>=7.5)return 'var(--blue-acc)';if(score>=5)return 'var(--amber)';return 'var(--red)';}
+function googleScoreColor(score){if(score===null||score===undefined||score==='')return 'var(--text3)';if(score>=4.5)return 'var(--green-acc)';if(score>=4)return 'var(--blue-acc)';if(score>=3)return 'var(--amber)';return 'var(--red)';}
 function currentPage(){return document.querySelector('.page.active')?.id?.replace('page-','')||'dashboard';}
 function formatMonthKey(value){if(!value)return '—';const [year,month]=String(value).split('-');const d=new Date(`${year}-${month||'01'}-01T12:00:00`);return d.toLocaleDateString('es-MX',{month:'short',year:'numeric'});}
 function formatShortDate(value){if(!value)return '—';const d=new Date(value);if(Number.isNaN(d.getTime()))return safeText(value);return d.toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'});}
@@ -2399,10 +2400,10 @@ function renderGoogleSummaryCards(){
       if(right!==left)return right-left;
       return a.name.localeCompare(b.name,'es',{sensitivity:'base'});
     });
-  el.innerHTML=cards.map(item=>`<div class="scard" style="min-height:unset;border-top:3px solid ${scoreBadgeColor(item.avg)}">
+  el.innerHTML=cards.map(item=>`<div class="scard" style="min-height:unset;border-top:3px solid ${googleScoreColor(item.avg)}">
     <div class="slabel">${escapeHtml(item.name)}</div>
-    <div class="sval" style="color:${scoreBadgeColor(item.avg)}">${item.avg!=null?item.avg.toFixed(2):'—'}</div>
-    <div class="ssub">${safeText(item.city,'Sin ciudad')} · ${item.count} review${item.count===1?'':'s'} · ${item.pending} pendiente${item.pending===1?'':'s'}</div>
+    <div class="sval" style="color:${googleScoreColor(item.avg)}">${item.avg!=null?item.avg.toFixed(2):'—'}</div>
+    <div class="ssub">${safeText(item.city,'Sin ciudad')} · ${item.count} review${item.count===1?'':'s'} · ${item.pending} pendiente${item.pending===1?'':'s'} · escala 1–5</div>
   </div>`).join('');
 }
 
