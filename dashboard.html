@@ -1075,7 +1075,9 @@ body.auth-ready .auth-screen { display:none; }
     <div class="phdr" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div><div class="phead">Reservaciones Cloudbeds</div><div class="psub" id="rescountlbl">Cargando...</div></div>
       <div class="fbar">
+        <input class="fsel" id="fressearch" type="search" placeholder="Buscar huésped" oninput="applyResFilters()" style="min-width:220px;cursor:text">
         <select class="fsel" id="freschannel" onchange="applyResFilters()"><option value="">Todos los canales</option><option value="direct">Directo</option><option value="booking">Booking.com</option><option value="expedia">Expedia</option><option value="airbnb">Airbnb</option></select>
+        <select class="fsel" id="frescity" onchange="applyResFilters()"><option value="">Todas las ciudades</option></select>
         <select class="fsel" id="fresprop" onchange="applyResFilters()"><option value="">Todos los complejos</option></select>
       </div>
     </div>
@@ -2371,6 +2373,7 @@ async function loadReservations(){
     const data=await apiRequest(API_RESERVATIONS,{method:'GET'});
     allReservations=data.reservations||[];
     reservationsLoaded=true;
+    buildResCityFilter();
     buildResPropFilter();
     applyResFilters();
   }catch(e){
@@ -2378,6 +2381,15 @@ async function loadReservations(){
     document.getElementById('restbody').innerHTML=`<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--red)">Error: ${escapeHtml(e.message)}</td></tr>`;
     document.getElementById('rescountlbl').textContent='Error al cargar';
   }
+}
+
+function buildResCityFilter(){
+  const sel=document.getElementById('frescity');
+  const current=sel.value;
+  const cities=[...new Set(allReservations.map(r=>textOr(r.properties?.city,'')).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
+  sel.innerHTML='<option value="">Todas las ciudades</option>';
+  cities.forEach(city=>{const o=document.createElement('option');o.value=city;o.textContent=safeCity(city);sel.appendChild(o);});
+  if(cities.includes(current))sel.value=current;
 }
 
 function buildResPropFilter(){
@@ -2394,10 +2406,14 @@ function buildResPropFilter(){
 }
 
 function applyResFilters(){
+  const query=normalizedKey(document.getElementById('fressearch').value);
   const ch=document.getElementById('freschannel').value;
+  const city=document.getElementById('frescity').value;
   const pr=document.getElementById('fresprop').value;
   resFiltered=allReservations.filter(r=>{
+    if(query&&!normalizedKey(textOr(r.guest_name,'')).includes(query))return false;
     if(ch&&r.channel!==ch)return false;
+    if(city&&textOr(r.properties?.city,'')!==city)return false;
     if(pr&&r.property_id!==pr)return false;
     return true;
   });
