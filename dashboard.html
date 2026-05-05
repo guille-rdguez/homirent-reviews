@@ -940,7 +940,7 @@ body.auth-ready .auth-screen { display:none; }
       <div class="fbar">
         <select class="fsel" id="fgprop" onchange="applyGoogleFilters()"><option value="">Todos los complejos</option></select>
         <select class="fsel" id="fgresponded" onchange="applyGoogleFilters()"><option value="">Todas</option><option value="false">Pendientes</option><option value="true">Respondidas</option></select>
-        <a href="https://business.google.com/reviews?authuser=reservas%40homirent.com" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="text-decoration:none">Responder más reviews ↗</a>
+        <button class="btn btn-primary btn-sm" id="google-manage-btn" onclick="openGoogleReviewManager()">Responder más reviews ↗</button>
       </div>
     </div>
     <div id="gcards" style="margin-top:14px;display:flex;flex-direction:column;gap:12px"></div>
@@ -2293,6 +2293,39 @@ function buildGooglePropFilter(){
   if([...seen.keys()].includes(current))sel.value=current;
 }
 
+function getSelectedGoogleProperty(){
+  const propertyId=document.getElementById('fgprop')?.value||'';
+  if(propertyId){
+    const exact=allProps.find(prop=>prop.id===propertyId);
+    if(exact)return exact;
+    const review=allGoogleReviews.find(item=>item.property_id===propertyId);
+    if(review?.properties)return {id:propertyId,name:textOr(review.properties.name,''),city:textOr(review.properties.city,'')};
+  }
+  return null;
+}
+
+function buildGoogleManageUrl({name='',city=''}={}){
+  const query=[normalizeSpaces(name),normalizeSpaces(city)].filter(Boolean).join(' ').trim();
+  if(!query)return 'https://www.google.com/search?q=my+business&authuser=reservas%40homirent.com';
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}&authuser=reservas%40homirent.com`;
+}
+
+function syncGoogleManageButton(){
+  const btn=document.getElementById('google-manage-btn');
+  if(!btn)return;
+  const property=getSelectedGoogleProperty();
+  btn.textContent=property?'Abrir perfil en Google ↗':'Responder más reviews ↗';
+}
+
+function openGoogleReviewManager(){
+  const property=getSelectedGoogleProperty();
+  const url=buildGoogleManageUrl({
+    name:property?.name||'',
+    city:property?.city||'',
+  });
+  window.open(url,'_blank','noopener');
+}
+
 function applyGoogleFilters(){
   const prop=document.getElementById('fgprop').value;
   const resp=document.getElementById('fgresponded').value;
@@ -2302,6 +2335,7 @@ function applyGoogleFilters(){
     if(resp==='false'&&r.responded)return false;
     return true;
   });
+  syncGoogleManageButton();
   renderGoogleReviews();
 }
 
@@ -2337,7 +2371,10 @@ function renderGoogleReviews(){
   if(!googleFiltered.length){el.innerHTML='<div class="card" style="padding:32px;text-align:center;color:var(--text3)">Sin resultados</div>';return;}
   el.innerHTML=googleFiltered.map(r=>{
     const responded=r.responded;
-    const placeReviewsUrl=r.place_id?`https://search.google.com/local/reviews?placeid=${encodeURIComponent(r.place_id)}&authuser=reservas%40homirent.com`:'https://business.google.com/reviews?authuser=reservas%40homirent.com';
+    const placeReviewsUrl=buildGoogleManageUrl({
+      name:r.properties?.name||'',
+      city:r.properties?.city||'',
+    });
     return `<div class="card" style="padding:16px 20px;opacity:${responded?'0.6':'1'}">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
